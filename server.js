@@ -193,11 +193,19 @@ function sendBiWeeklyReport() {
 }
 
 // ================= API REST =================
+// Claves de acceso 
+const VIEWER_KEY = process.env.VIEWER_KEY || 'lectura2026'; // Contraseña para solo lectura
 
+// Único Endpoint de Login con soporte para Admin y Viewer
 app.post('/api/login', (req, res) => {
     const { password } = req.body;
-    if (password === API_KEY) res.json({ success: true, apiKey: API_KEY });
-    else res.status(401).json({ error: 'Contraseña incorrecta' });
+    if (password === API_KEY) {
+        res.json({ success: true, role: 'admin', apiKey: API_KEY });
+    } else if (password === VIEWER_KEY) {
+        res.json({ success: true, role: 'viewer', apiKey: '' });
+    } else {
+        res.status(401).json({ error: 'Contraseña incorrecta' });
+    }
 });
 
 app.get('/api/state', (req, res) => {
@@ -221,6 +229,7 @@ app.get('/api/state', (req, res) => {
         });
     });
 });
+
 
 // Actualizar configuración (Admin Email)
 app.post('/api/settings', authenticateApiKey, (req, res) => {
@@ -270,6 +279,7 @@ app.post('/api/deployments/check-updates', authenticateApiKey, async (req, res) 
         res.json({ success: true, message: `Sincronización por provincia completada. ${updatedCount} actualizadas.` });
     });
 });
+
 
 // Endpoint corregido para guardar correctamente la version_url
 app.post('/api/deployments', authenticateApiKey, (req, res) => {

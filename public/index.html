@@ -27,18 +27,18 @@
                     <i data-lucide="lock" class="w-8 h-8"></i>
                 </div>
                 <h1 class="text-xl font-bold text-white">Version Hub Login</h1>
-                <p class="text-xs text-slate-400">Ingresa la API Key de acceso para administrar el tablero.</p>
+                <p class="text-xs text-slate-400">Ingresa tu contraseña de acceso o lectura.</p>
             </div>
 
             <form @submit.prevent="login()" class="space-y-4">
                 <div>
-                    <label class="block text-xs font-medium text-slate-300 mb-1">Contraseña / API Key</label>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Contraseña</label>
                     <input type="password" x-model="passwordInput" placeholder="••••••••••••••••" required
                            class="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500">
                 </div>
 
                 <div x-show="loginError" class="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs rounded-lg text-center" x-cloak>
-                    Credenciales inválidas. Verifica tu API Key.
+                    Credenciales inválidas. Verifica tu contraseña.
                 </div>
 
                 <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-2.5 rounded-lg text-sm transition-all shadow-lg shadow-indigo-600/20">
@@ -63,14 +63,19 @@
                     </div>
                 </div>
                 <div class="flex items-center space-x-3">
-                    <button @click="checkProvinceUpdates()" class="flex items-center space-x-2 bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-all shadow-md">
-                        <i data-lucide="cloud-download" class="w-3.5 h-3.5"></i>
-                        <span>Sync Provincias JSON</span>
-                    </button>
-                    <button @click="checkOnlineUpdates()" class="flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-all shadow-md shadow-indigo-600/20">
-                        <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
-                        <span>Sync Apps Online</span>
-                    </button>
+                    <!-- Botones de sincronización (Solo Administrador) -->
+                    <template x-if="userRole === 'admin'">
+                        <div class="flex items-center space-x-3">
+                            <button @click="checkProvinceUpdates()" class="flex items-center space-x-2 bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-all shadow-md">
+                                <i data-lucide="cloud-download" class="w-3.5 h-3.5"></i>
+                                <span>Sync Provincias JSON</span>
+                            </button>
+                            <button @click="checkOnlineUpdates()" class="flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-all shadow-md shadow-indigo-600/20">
+                                <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+                                <span>Sync Apps Online</span>
+                            </button>
+                        </div>
+                    </template>
                     <button @click="logout()" title="Cerrar sesión" class="p-2 bg-slate-700/50 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors">
                         <i data-lucide="log-out" class="w-4 h-4"></i>
                     </button>
@@ -108,12 +113,12 @@
                 <div class="bg-slate-800/80 backdrop-blur border border-slate-700/80 p-5 rounded-2xl shadow-sm">
                     <div class="flex items-center justify-between">
                         <span class="text-sm font-medium text-slate-400">Desactualizadas</span>
-                        <div class="p-2 bg-amber-500/10 text-amber-400 rounded-lg"><i data-lucide="alert-triangle" class="w-5 h-5"></i></div>
+                        <div class="p-2 bg-rose-500/10 text-rose-400 rounded-lg"><i data-lucide="alert-triangle" class="w-5 h-5"></i></div>
                     </div>
                     <div class="mt-4 flex items-baseline justify-between">
                         <div class="flex items-baseline space-x-2">
-                            <span class="text-2xl font-bold text-amber-400" x-text="countOutdated()"></span>
-                            <span class="text-xs font-semibold text-amber-500/90 bg-amber-500/10 px-2 py-0.5 rounded-full" x-text="getOutdatedPercentage()"></span>
+                            <span class="text-2xl font-bold text-rose-400" x-text="countOutdated()"></span>
+                            <span class="text-xs font-semibold text-rose-500/90 bg-rose-500/10 px-2 py-0.5 rounded-full" x-text="getOutdatedPercentage()"></span>
                         </div>
                         <span class="text-xs text-slate-400">Requieren update</span>
                     </div>
@@ -126,7 +131,7 @@
                     <i data-lucide="grid" class="w-4 h-4"></i>
                     <span>Matriz de Versiones</span>
                 </button>
-                <button @click="currentTab = 'crud'" :class="currentTab === 'crud' ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-slate-400 hover:text-slate-200'" class="pb-3 border-b-2 font-medium text-sm transition-colors flex items-center space-x-2 whitespace-nowrap">
+                <button x-show="userRole === 'admin'" @click="currentTab = 'crud'" :class="currentTab === 'crud' ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-slate-400 hover:text-slate-200'" class="pb-3 border-b-2 font-medium text-sm transition-colors flex items-center space-x-2 whitespace-nowrap">
                     <i data-lucide="sliders" class="w-4 h-4"></i>
                     <span>Gestión (Apps & Provincias)</span>
                 </button>
@@ -134,7 +139,7 @@
                     <i data-lucide="book-open" class="w-4 h-4"></i>
                     <span>Documentación API</span>
                 </button>
-                <button @click="currentTab = 'settings'" :class="currentTab === 'settings' ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-slate-400 hover:text-slate-200'" class="pb-3 border-b-2 font-medium text-sm transition-colors flex items-center space-x-2 whitespace-nowrap">
+                <button x-show="userRole === 'admin'" @click="currentTab = 'settings'" :class="currentTab === 'settings' ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-slate-400 hover:text-slate-200'" class="pb-3 border-b-2 font-medium text-sm transition-colors flex items-center space-x-2 whitespace-nowrap">
                     <i data-lucide="settings" class="w-4 h-4"></i>
                     <span>Configuración & Reportes</span>
                 </button>
@@ -211,7 +216,8 @@
                                                               'bg-rose-500/15 text-rose-400 border-rose-500/30': getVersionStatus(app.latest, getVersion(app.id, branch.id)) === 'outdated'
                                                           }"
                                                           x-text="getVersion(app.id, branch.id)"></span>
-                                                    <button @click="openEditDeployment(app, branch)" class="mt-1 text-[10px] text-indigo-400 hover:underline">Editar</button>
+                                                    <!-- Botón Editar (Solo Administrador) -->
+                                                    <button x-show="userRole === 'admin'" @click="openEditDeployment(app, branch)" class="mt-1 text-[10px] text-indigo-400 hover:underline">Editar</button>
                                                 </div>
                                             </td>
                                         </template>
@@ -223,8 +229,8 @@
                 </div>
             </div>
 
-            <!-- TAB 2: CRUD MANAGEMENT -->
-            <div x-show="currentTab === 'crud'" class="space-y-8" x-cloak>
+            <!-- TAB 2: CRUD MANAGEMENT (Solo Admin) -->
+            <div x-show="currentTab === 'crud' && userRole === 'admin'" class="space-y-8" x-cloak>
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
                     <!-- Branch CRUD -->
                     <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-sm">
@@ -347,8 +353,8 @@
                 </div>
             </div>
 
-            <!-- TAB 4: SETTINGS & REPORTS -->
-            <div x-show="currentTab === 'settings'" class="space-y-6" x-cloak>
+            <!-- TAB 4: SETTINGS & REPORTS (Solo Admin) -->
+            <div x-show="currentTab === 'settings' && userRole === 'admin'" class="space-y-6" x-cloak>
                 <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-sm space-y-4">
                     <h3 class="text-base font-bold text-white flex items-center space-x-2">
                         <i data-lucide="mail" class="w-5 h-5 text-indigo-400"></i>
@@ -466,7 +472,8 @@
         document.addEventListener('alpine:init', () => {
             Alpine.data('versionDashboard', () => ({
                 isAuthenticated: localStorage.getItem('version_hub_auth') === 'true',
-                apiKey: localStorage.getItem('version_hub_key') || 'version-hub-secret-2026',
+                userRole: localStorage.getItem('version_hub_role') || 'admin',
+                apiKey: localStorage.getItem('version_hub_key') || '',
                 passwordInput: '',
                 loginError: false,
                 currentTab: 'matrix',
@@ -516,11 +523,16 @@
                         });
                         const data = await res.json();
                         if (data.success) {
-                            this.apiKey = data.apiKey;
+                            this.userRole = data.role || 'admin';
+                            this.apiKey = data.apiKey || '';
                             localStorage.setItem('version_hub_auth', 'true');
-                            localStorage.setItem('version_hub_key', data.apiKey);
+                            localStorage.setItem('version_hub_role', this.userRole);
+                            localStorage.setItem('version_hub_key', this.apiKey);
                             this.isAuthenticated = true;
                             this.loginError = false;
+                            if (this.userRole === 'viewer' && (this.currentTab === 'crud' || this.currentTab === 'settings')) {
+                                this.currentTab = 'matrix';
+                            }
                             await this.fetchState();
                             setTimeout(() => { if (typeof lucide !== 'undefined') lucide.createIcons(); }, 100);
                         } else {
@@ -533,9 +545,12 @@
 
                 logout() {
                     localStorage.removeItem('version_hub_auth');
+                    localStorage.removeItem('version_hub_role');
                     localStorage.removeItem('version_hub_key');
                     this.isAuthenticated = false;
+                    this.userRole = 'admin';
                     this.passwordInput = '';
+                    this.currentTab = 'matrix';
                 },
 
                 async fetchState() {
@@ -556,6 +571,7 @@
                 },
 
                 async saveAdminEmail() {
+                    if (this.userRole !== 'admin') return;
                     try {
                         const res = await fetch('/api/settings', {
                             method: 'POST',
@@ -574,6 +590,7 @@
                 },
 
                 async checkOnlineUpdates() {
+                    if (this.userRole !== 'admin') return;
                     try {
                         this.addLog('Consultando actualizaciones en repositorios externos...');
                         const res = await fetch('/api/apps/check-updates', {
@@ -593,6 +610,7 @@
                 },
 
                 async checkProvinceUpdates() {
+                    if (this.userRole !== 'admin') return;
                     try {
                         this.addLog('Sincronizando versiones desde endpoints JSON de provincias...');
                         const res = await fetch('/api/deployments/check-updates', {
@@ -612,6 +630,7 @@
                 },
 
                 async triggerManualReport() {
+                    if (this.userRole !== 'admin') return;
                     try {
                         this.addLog('Enviando reporte PDF quincenal al administrador...');
                         const res = await fetch('/api/reports/send', {
@@ -674,6 +693,7 @@
                 },
 
                 openEditDeployment(app, branch) {
+                    if (this.userRole !== 'admin') return;
                     this.selectedApp = app;
                     this.selectedBranch = branch;
                     this.modalVersion = this.getVersion(app.id, branch.id);
@@ -682,6 +702,7 @@
                 },
 
                 async saveDeploymentVersion() {
+                    if (this.userRole !== 'admin') return;
                     await fetch('/api/deployments', {
                         method: 'POST',
                         headers: { 
@@ -700,11 +721,13 @@
                 },
 
                 openBranchModal() {
+                    if (this.userRole !== 'admin') return;
                     this.branchForm = { name: '', contactEmail: '' };
                     this.showBranchModal = true;
                 },
 
                 async saveBranch() {
+                    if (this.userRole !== 'admin') return;
                     if (!this.branchForm.name) return;
                     await fetch('/api/branches', {
                         method: 'POST',
@@ -719,6 +742,7 @@
                 },
 
                 async deleteBranch(id) {
+                    if (this.userRole !== 'admin') return;
                     await fetch(`/api/branches/${id}`, { 
                         method: 'DELETE',
                         headers: { 'x-api-key': this.apiKey }
@@ -727,18 +751,21 @@
                 },
 
                 openAppModal() {
+                    if (this.userRole !== 'admin') return;
                     this.isEditingApp = false;
                     this.appForm = { id: '', name: '', latest: 'v1.0.0', description: '', check_url: '' };
                     this.showAppModal = true;
                 },
 
                 openEditAppModal(app) {
+                    if (this.userRole !== 'admin') return;
                     this.isEditingApp = true;
                     this.appForm = { id: app.id, name: app.name, latest: app.latest, description: app.description || '', check_url: app.check_url || '' };
                     this.showAppModal = true;
                 },
 
                 async saveApp() {
+                    if (this.userRole !== 'admin') return;
                     if (!this.appForm.name) return;
                     const url = this.isEditingApp ? `/api/apps/${this.appForm.id}` : '/api/apps';
                     const method = this.isEditingApp ? 'PUT' : 'POST';
@@ -756,6 +783,7 @@
                 },
 
                 async deleteApp(id) {
+                    if (this.userRole !== 'admin') return;
                     await fetch(`/api/apps/${id}`, { 
                         method: 'DELETE',
                         headers: { 'x-api-key': this.apiKey }

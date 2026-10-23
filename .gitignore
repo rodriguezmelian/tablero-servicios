@@ -1,5 +1,10 @@
+# Configuración de Docker y entorno
 docker-compose.yml
 .env
+
+# Base de datos
+data/database.sqlite
+
 
 # Logs
 logs
