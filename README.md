@@ -58,24 +58,30 @@ http://localhost:3000
 
 ## Variables de entorno
 
-El proyecto usa estas variables opcionales:
+El proyecto usa estas variables de entorno para configurar la app y la autenticación:
 
 ```bash
 PORT=3000
-API_KEY=tu-api-key-segura
+NODE_ENV=production
+API_KEY=tu-api-key-admin
+VIEWER_KEY=tu-api-key-lectura
 SMTP_HOST=smtp.tu-email.com
-SMTP_PORT=587
-SMTP_USER=usuario
+SMTP_PORT=465
+SMTP_USER=usuario@dominio.com
 SMTP_PASS=contraseña
 ```
 
-Si no se define `API_KEY`, el servidor usa un valor por defecto:
+Valores por defecto si no se definen:
 
 ```bash
-version-hub-secret-2026
+API_KEY=version-hub-secret-2026
+VIEWER_KEY=lectura2026
+SMTP_HOST=mail.weit.com.ar
+SMTP_PORT=465
 ```
 
-> Se recomienda definir `API_KEY` explícitamente en producción y no dejarlo en código fuente.
+> `API_KEY` corresponde al perfil administrador y `VIEWER_KEY` al acceso de solo lectura.
+> Esto queda reflejado en `.env.example` del proyecto.
 
 ## Ejecutar con Docker
 
@@ -103,9 +109,31 @@ docker compose down
 
 ## Uso de la app
 
-### Login
+### Login y roles
 
-La interfaz web solicita una API Key para iniciar sesión.
+La aplicación soporta dos perfiles de acceso desde el mismo login:
+
+| Rol | Credencial | Permisos |
+| --- | --- | --- |
+| `admin` | `API_KEY` | Accede a toda la administración, edición de apps/provincias, sincronización, configuración y reportes. |
+| `viewer` | `VIEWER_KEY` | Solo visualización del estado general y la matriz de versiones. No puede editar ni cambiar configuración. |
+
+Ejemplo de login:
+
+```json
+{
+  "password": "tu-api-key-admin"
+}
+```
+
+Cuando se autentica con la clave de administrador, la UI habilita:
+- gestión de aplicaciones
+- gestión de provincias
+- sincronización automática desde URLs externas
+- configuración del email del administrador
+- envío de reportes
+
+Cuando se autentica con la clave de solo lectura, la UI solo muestra la vista de consulta y bloquea acciones administrativas.
 
 ### Panel principal
 
@@ -114,11 +142,36 @@ Desde el dashboard se puede:
 - Ver provincias activas
 - Ver aplicaciones monitoreadas
 - Consultar la matriz de versiones por provincia
-- Agregar/editar/eliminar provincias
-- Agregar/editar/eliminar aplicaciones
-- Sincronizar versiones desde URLs externas
-- Enviar reporte PDF al administrador
-- Configurar email del administrador
+- Ver informes de estado general
+- En el rol admin: agregar/editar/eliminar provincias
+- En el rol admin: agregar/editar/eliminar aplicaciones
+- En el rol admin: sincronizar versiones desde URLs externas
+- En el rol admin: enviar reporte PDF al administrador
+- En el rol admin: configurar email del administrador
+
+### Autenticación y permisos por API
+
+El backend responde con el rol al iniciar sesión:
+
+```json
+{
+  "success": true,
+  "role": "admin",
+  "apiKey": "..."
+}
+```
+
+En el caso de solo lectura, la respuesta es:
+
+```json
+{
+  "success": true,
+  "role": "viewer",
+  "apiKey": ""
+}
+```
+
+La lógica principal del backend está en `server.js` y la validación de permisos se realiza en la UI y en los endpoints administrativos.
 
 ## MCP (Model Context Protocol)
 
