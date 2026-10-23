@@ -1,0 +1,11 @@
+{
+  "name": "version-hub-mcp",
+  "version": "1.0.0",
+  "type": "module",
+  "bin": {
+    "version-hub-mcp": "./index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.1"
+  }
+}

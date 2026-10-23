@@ -43,6 +43,13 @@ build/Release
 # Dependency directories
 node_modules/
 jspm_packages/
+mcp/node_modules/
+mcp/package-lock.json
+
+# MCP local environment
+mcp/.env
+mcp/.env.*
+mcp/*.log
 
 # Snowpack dependency directory (https://snowpack.dev/)
 web_modules/

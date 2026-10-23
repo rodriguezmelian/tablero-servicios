@@ -120,6 +120,96 @@ Desde el dashboard se puede:
 - Enviar reporte PDF al administrador
 - Configurar email del administrador
 
+## MCP (Model Context Protocol)
+
+El proyecto incluye un servidor MCP para integrar Version Hub con clientes compatibles con MCP, por ejemplo para consultar el estado de versiones o actualizar despliegues desde un agente o herramienta externa.
+
+### Carpeta MCP
+
+```bash
+./mcp/
+├── index.js
+├── package.json
+└── node_modules/   # generado al instalar dependencias
+```
+
+### Instalación del servidor MCP
+
+```bash
+cd mcp
+npm install
+npm link
+
+Esto creará el comando global version-hub-mcp apuntando siempre a este repositorio independiente, sin importar dónde lo guardes en el futuro.
+
+```
+
+### Variables de entorno para MCP
+
+El servidor MCP usa estas variables:
+
+```bash
+VERSION_HUB_URL=http://localhost:3000
+VERSION_HUB_API_KEY=tu-api-key
+```
+
+Si la app está corriendo en otra máquina o servidor, seteá la URL remota correspondiente.
+
+### Ejecutar el servidor MCP manualmente
+
+```bash
+cd mcp
+VERSION_HUB_URL=http://localhost:3000 VERSION_HUB_API_KEY=tu-api-key node index.js
+```
+
+También podés usar el binario definido en el paquete:
+
+```bash
+cd mcp
+VERSION_HUB_URL=http://localhost:3000 VERSION_HUB_API_KEY=tu-api-key npx version-hub-mcp
+```
+
+### Configuración en un cliente MCP
+
+Ejemplo de configuración para un cliente que soporte `mcpServers`:
+
+```json
+{
+  "mcpServers": {
+    "type": "local",
+      "command": [
+        "version-hub-mcp"
+       ],
+       "enabled": true,
+       "environment": {
+         "VERSION_HUB_URL": "http://localhost:3000",
+         "VERSION_HUB_API_KEY": "tu-api-key"
+      }
+    }
+  }
+
+```
+
+### Herramientas disponibles
+
+El servidor MCP expone dos herramientas:
+
+- `get_version_matrix`: devuelve el estado completo de la base de datos del tablero.
+- `update_deployment_version`: actualiza la versión de una app en una provincia específica.
+
+Ejemplo de uso conceptual:
+
+```json
+{
+  "name": "update_deployment_version",
+  "arguments": {
+    "appId": "app-rancher",
+    "branchId": "salta",
+    "version": "v2.1.0"
+  }
+}
+```
+
 ## API REST
 
 La API expone endpoints básicos para gestionar el estado del sistema.
