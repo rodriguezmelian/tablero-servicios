@@ -10,13 +10,19 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const API_KEY = process.env.API_KEY || 'version-hub-secret-2026';
 
-// Configuración de Correo SMTP
+// Configuración de Correo SMTP adaptada para puerto 465 con SSL y certificados
+const smtpPort = parseInt(process.env.SMTP_PORT || 465, 10);
 const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST || 'smtp.ethereal.email',
-    port: process.env.SMTP_PORT || 587,
+    host: process.env.SMTP_HOST || 'mail.weit.com.ar',
+    port: smtpPort,
+    secure: true, // Obligatorio true para el puerto 465
     auth: {
-        user: process.env.SMTP_USER || 'user@ethereal.email',
-        pass: process.env.SMTP_PASS || 'pass'
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS
+    },
+    tls: {
+        // Evita que Node.js rechace la conexión si el servidor usa certificados autofirmados
+        rejectUnauthorized: false
     }
 });
 
@@ -170,7 +176,7 @@ function sendBiWeeklyReport() {
                         const pdfBuffer = await generatePDFReport({ branches, apps, deployments: deploymentsMap });
 
                         await transporter.sendMail({
-                            from: '"Version Hub" <no-reply@versionhub.local>',
+                            from: `"Version Hub" <${process.env.SMTP_USER}>`,
                             to: adminEmail,
                             subject: 'Reporte Quincenal de Control de Versiones',
                             text: 'Adjunto encontrarás el reporte quincenal actualizado del tablero de control de versiones.',
