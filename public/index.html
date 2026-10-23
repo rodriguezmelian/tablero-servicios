@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full bg-slate-900">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard de Control de Versiones - MultiProvincia</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Alpine.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Google Fonts Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        [x-cloak] { display: none !important; }
+    </style>
+</head>
+<body class="h-full text-slate-100 antialiased" x-data="versionDashboard()" x-init="init()">
+
+    <!-- PANTALLA DE LOGIN -->
+    <div x-show="!isAuthenticated" class="h-full flex items-center justify-center bg-slate-950 px-4" x-cloak>
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-8 shadow-2xl space-y-6">
+            <div class="flex flex-col items-center text-center space-y-2">
+                <div class="bg-indigo-600 p-3 rounded-2xl text-white shadow-lg shadow-indigo-500/30">
+                    <i data-lucide="lock" class="w-8 h-8"></i>
+                </div>
+                <h1 class="text-xl font-bold text-white">Version Hub Login</h1>
+                <p class="text-xs text-slate-400">Ingresa la API Key de acceso para administrar el tablero.</p>
+            </div>
+
+            <form @submit.prevent="login()" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Contraseña / API Key</label>
+                    <input type="password" x-model="passwordInput" placeholder="••••••••••••••••" required
+                           class="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500">
+                </div>
+
+                <div x-show="loginError" class="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs rounded-lg text-center" x-cloak>
+                    Credenciales inválidas. Verifica tu API Key.
+                </div>
+
+                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-2.5 rounded-lg text-sm transition-all shadow-lg shadow-indigo-600/20">
+                    Iniciar Sesión
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- DASHBOARD PRINCIPAL -->
+    <div x-show="isAuthenticated" class="min-h-full flex flex-col" x-cloak>
+        <!-- Top Navbar -->
+        <header class="bg-slate-800 border-b border-slate-700 sticky top-0 z-30">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div class="bg-indigo-600 p-2 rounded-xl text-white shadow-lg shadow-indigo-500/30">
+                        <i data-lucide="layers" class="w-6 h-6"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-lg font-bold text-white tracking-tight">Version Hub</h1>
+                        <p class="text-xs text-slate-400">Control de Despliegues por Provincia (SQLite)</p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-3">
+                    <button @click="checkProvinceUpdates()" class="flex items-center space-x-2 bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-all shadow-md">
+                        <i data-lucide="cloud-download" class="w-3.5 h-3.5"></i>
+                        <span>Sync Provincias JSON</span>
+                    </button>
+                    <button @click="checkOnlineUpdates()" class="flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-all shadow-md shadow-indigo-600/20">
+                        <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+                        <span>Sync Apps Online</span>
+                    </button>
+                    <button @click="logout()" title="Cerrar sesión" class="p-2 bg-slate-700/50 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors">
+                        <i data-lucide="log-out" class="w-4 h-4"></i>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content Layout -->
+        <div class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col gap-8">
+
+            <!-- Stats Overview Cards -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div class="bg-slate-800/80 backdrop-blur border border-slate-700/80 p-5 rounded-2xl shadow-sm">
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm font-medium text-slate-400">Provincias Activas</span>
+                        <div class="p-2 bg-blue-500/10 text-blue-400 rounded-lg"><i data-lucide="map-pin" class="w-5 h-5"></i></div>
+                    </div>
+                    <div class="mt-4 flex items-baseline justify-between">
+                        <span class="text-2xl font-bold text-white" x-text="branches.length"></span>
+                        <span class="text-xs text-emerald-400 font-medium">Registradas</span>
+                    </div>
+                </div>
+
+                <div class="bg-slate-800/80 backdrop-blur border border-slate-700/80 p-5 rounded-2xl shadow-sm">
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm font-medium text-slate-400">Aplicaciones Monitoreadas</span>
+                        <div class="p-2 bg-purple-500/10 text-purple-400 rounded-lg"><i data-lucide="cpu" class="w-5 h-5"></i></div>
+                    </div>
+                    <div class="mt-4 flex items-baseline justify-between">
+                        <span class="text-2xl font-bold text-white" x-text="apps.length"></span>
+                        <span class="text-xs text-purple-400 font-medium">Activas</span>
+                    </div>
+                </div>
+
+                <div class="bg-slate-800/80 backdrop-blur border border-slate-700/80 p-5 rounded-2xl shadow-sm">
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm font-medium text-slate-400">Desactualizadas</span>
+                        <div class="p-2 bg-amber-500/10 text-amber-400 rounded-lg"><i data-lucide="alert-triangle" class="w-5 h-5"></i></div>
+                    </div>
+                    <div class="mt-4 flex items-baseline justify-between">
+                        <div class="flex items-baseline space-x-2">
+                            <span class="text-2xl font-bold text-amber-400" x-text="countOutdated()"></span>
+                            <span class="text-xs font-semibold text-amber-500/90 bg-amber-500/10 px-2 py-0.5 rounded-full" x-text="getOutdatedPercentage()"></span>
+                        </div>
+                        <span class="text-xs text-slate-400">Requieren update</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Navigation Tabs -->
+            <div class="border-b border-slate-700 flex space-x-6 overflow-x-auto">
+                <button @click="currentTab = 'matrix'" :class="currentTab === 'matrix' ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-slate-400 hover:text-slate-200'" class="pb-3 border-b-2 font-medium text-sm transition-colors flex items-center space-x-2 whitespace-nowrap">
+                    <i data-lucide="grid" class="w-4 h-4"></i>
+                    <span>Matriz de Versiones</span>
+                </button>
+                <button @click="currentTab = 'crud'" :class="currentTab === 'crud' ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-slate-400 hover:text-slate-200'" class="pb-3 border-b-2 font-medium text-sm transition-colors flex items-center space-x-2 whitespace-nowrap">
+                    <i data-lucide="sliders" class="w-4 h-4"></i>
+                    <span>Gestión (Apps & Provincias)</span>
+                </button>
+                <button @click="currentTab = 'docs'" :class="currentTab === 'docs' ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-slate-400 hover:text-slate-200'" class="pb-3 border-b-2 font-medium text-sm transition-colors flex items-center space-x-2 whitespace-nowrap">
+                    <i data-lucide="book-open" class="w-4 h-4"></i>
+                    <span>Documentación API</span>
+                </button>
+                <button @click="currentTab = 'settings'" :class="currentTab === 'settings' ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-slate-400 hover:text-slate-200'" class="pb-3 border-b-2 font-medium text-sm transition-colors flex items-center space-x-2 whitespace-nowrap">
+                    <i data-lucide="settings" class="w-4 h-4"></i>
+                    <span>Configuración & Reportes</span>
+                </button>
+            </div>
+
+            <!-- TAB 1: MATRIX VIEW -->
+            <div x-show="currentTab === 'matrix'" class="space-y-6" x-cloak>
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-800/50 p-4 rounded-xl border border-slate-700/60">
+                    <div>
+                        <h2 class="text-base font-semibold text-white">Matriz de Versiones por Provincia</h2>
+                        <p class="text-xs text-slate-400">Verde: Al día | Amarillo: Adelantada/Beta | Gris: No Aplica (N/A) | Rojo: Desactualizada.</p>
+                    </div>
+                    <!-- Filtros Combinados (Provincia y Tecnología) -->
+                    <div class="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                        <!-- Selector de Provincia -->
+                        <div class="w-full sm:w-48">
+                            <select x-model="selectedProvinceFilter" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500">
+                                <option value="">Todas las provincias</option>
+                                <template x-for="branch in branches" :key="branch.id">
+                                    <option :value="branch.id" x-text="branch.name"></option>
+                                </template>
+                            </select>
+                        </div>
+                        <!-- Buscador de Tecnología -->
+                        <div class="w-full sm:w-64">
+                            <div class="relative">
+                                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400"><i data-lucide="search" class="w-4 h-4"></i></span>
+                                <input type="text" x-model="searchQuery" placeholder="Filtrar tecnología..." class="w-full bg-slate-900 border border-slate-700 rounded-lg pl-9 pr-4 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-slate-800 border border-slate-700 rounded-2xl shadow-sm overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-slate-900/60 border-b border-slate-700 text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                                    <th class="py-4 px-6">Aplicación / Repositorio</th>
+                                    <th class="py-4 px-6 text-center">Última Versión</th>
+                                    <template x-for="branch in filteredBranches" :key="branch.id">
+                                        <th class="py-4 px-6 text-center" x-text="branch.name"></th>
+                                    </template>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-700 text-sm">
+                                <template x-for="app in filteredApps" :key="app.id">
+                                    <tr class="hover:bg-slate-700/30 transition-colors">
+                                        <td class="py-4 px-6 font-medium text-white">
+                                            <div class="flex items-center space-x-3">
+                                                <div class="p-2 bg-slate-700/50 rounded-lg text-indigo-400">
+                                                    <i data-lucide="box" class="w-4 h-4"></i>
+                                                </div>
+                                                <div>
+                                                    <div x-text="app.name" class="font-semibold text-white"></div>
+                                                    <div class="text-xs text-slate-400" x-text="app.description"></div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td class="py-4 px-6 text-center">
+                                            <div class="inline-flex flex-col items-center">
+                                                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20" x-text="app.latest"></span>
+                                                <span class="text-[10px] text-slate-500 truncate max-w-[120px]" x-text="app.check_url ? 'Auto-check ON' : ''"></span>
+                                            </div>
+                                        </td>
+                                        <template x-for="branch in filteredBranches" :key="branch.id">
+                                            <td class="py-4 px-6 text-center">
+                                                <div class="inline-flex flex-col items-center">
+                                                    <span class="px-2.5 py-1 rounded-md text-xs font-medium border"
+                                                          :class="{
+                                                              'bg-emerald-500/15 text-emerald-400 border-emerald-500/30': getVersionStatus(app.latest, getVersion(app.id, branch.id)) === 'ok',
+                                                              'bg-amber-500/15 text-amber-400 border-amber-500/30': getVersionStatus(app.latest, getVersion(app.id, branch.id)) === 'ahead',
+                                                              'bg-slate-700/40 text-slate-400 border-slate-600': getVersionStatus(app.latest, getVersion(app.id, branch.id)) === 'na',
+                                                              'bg-rose-500/15 text-rose-400 border-rose-500/30': getVersionStatus(app.latest, getVersion(app.id, branch.id)) === 'outdated'
+                                                          }"
+                                                          x-text="getVersion(app.id, branch.id)"></span>
+                                                    <button @click="openEditDeployment(app, branch)" class="mt-1 text-[10px] text-indigo-400 hover:underline">Editar</button>
+                                                </div>
+                                            </td>
+                                        </template>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 2: CRUD MANAGEMENT -->
+            <div x-show="currentTab === 'crud'" class="space-y-8" x-cloak>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <!-- Branch CRUD -->
+                    <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-sm">
+                        <div class="flex items-center justify-between pb-4 border-b border-slate-700">
+                            <h2 class="text-base font-semibold text-white flex items-center space-x-2">
+                                <i data-lucide="map-pin" class="w-5 h-5 text-indigo-400"></i>
+                                <span>Administrar Provincias</span>
+                            </h2>
+                            <button @click="openBranchModal()" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-all">
+                                + Nueva Provincia
+                            </button>
+                        </div>
+                        <div class="mt-4 divide-y divide-slate-700">
+                            <template x-for="branch in branches" :key="branch.id">
+                                <div class="py-3 flex items-center justify-between">
+                                    <div>
+                                        <div class="font-semibold text-white text-sm" x-text="branch.name"></div>
+                                        <div class="text-xs text-slate-400" x-text="'ID: ' + branch.id + ' | Mail: ' + (branch.region || 'No especificado')"></div>
+                                    </div>
+                                    <div class="flex items-center space-x-2">
+                                        <button @click="deleteBranch(branch.id)" class="p-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded-lg text-xs"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+
+                    <!-- App CRUD -->
+                    <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-sm">
+                        <div class="flex items-center justify-between pb-4 border-b border-slate-700">
+                            <h2 class="text-base font-semibold text-white flex items-center space-x-2">
+                                <i data-lucide="cpu" class="w-5 h-5 text-purple-400"></i>
+                                <span>Administrar Aplicaciones</span>
+                            </h2>
+                            <button @click="openAppModal()" class="bg-purple-600 hover:bg-purple-500 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-all">
+                                + Nueva Aplicación
+                            </button>
+                        </div>
+                        <div class="mt-4 divide-y divide-slate-700">
+                            <template x-for="app in apps" :key="app.id">
+                                <div class="py-3 flex items-center justify-between">
+                                    <div>
+                                        <div class="font-semibold text-white text-sm flex items-center space-x-2">
+                                            <span x-text="app.name"></span>
+                                            <span class="px-2 py-0.5 rounded text-[10px] bg-purple-500/10 text-purple-400 border border-purple-500/20" x-text="app.latest"></span>
+                                        </div>
+                                        <div class="text-xs text-slate-400" x-text="app.description"></div>
+                                        <div class="text-[10px] text-indigo-300 font-mono mt-0.5" x-text="app.check_url ? 'URL: ' + app.check_url : 'Sin URL de auto-check'"></div>
+                                    </div>
+                                    <div class="flex items-center space-x-2">
+                                        <button @click="openEditAppModal(app)" class="p-1.5 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 rounded-lg text-xs" title="Editar"><i data-lucide="edit-3" class="w-3.5 h-3.5"></i></button>
+                                        <button @click="deleteApp(app.id)" class="p-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded-lg text-xs" title="Eliminar"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 3: API DOCS -->
+            <div x-show="currentTab === 'docs'" class="space-y-6" x-cloak>
+                <div class="bg-slate-800/50 p-4 rounded-xl border border-slate-700/60 space-y-2">
+                    <h2 class="text-base font-semibold text-white">Documentación de la API REST & Autenticación</h2>
+                    <p class="text-xs text-slate-400">Los métodos de modificación (<code class="text-indigo-300">POST</code>, <code class="text-indigo-300">PUT</code>, <code class="text-indigo-300">DELETE</code>) requieren autenticación mediante el header HTTP <code class="text-emerald-400">x-api-key</code>.</p>
+                    <div class="bg-slate-900/80 p-3 rounded-lg border border-slate-700 text-xs font-mono text-slate-300">
+                        Header requerido: <code class="text-amber-400">x-api-key: version-hub-secret-2026</code>
+                    </div>
+                </div>
+
+                <div class="space-y-6">
+                    <!-- Endpoint 1: Get State -->
+                    <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-sm space-y-4">
+                        <div class="flex items-center space-x-3">
+                            <span class="px-2.5 py-1 rounded-md text-xs font-bold bg-blue-500/10 text-blue-400 border border-blue-500/30">GET</span>
+                            <code class="text-sm font-mono text-white">/api/state</code>
+                            <span class="text-[10px] bg-slate-700 text-slate-300 px-2 py-0.5 rounded">Público</span>
+                        </div>
+                        <p class="text-xs text-slate-300">Obtiene el estado completo del sistema: provincias, aplicaciones y los despliegues asociados.</p>
+                        <pre class="bg-slate-950 p-3 rounded-lg text-xs font-mono text-emerald-400 overflow-x-auto">curl -X GET http://localhost:3000/api/state</pre>
+                    </div>
+
+                    <!-- Endpoint 2: Update Deployment -->
+                    <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-sm space-y-4">
+                        <div class="flex items-center space-x-3">
+                            <span class="px-2.5 py-1 rounded-md text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">POST</span>
+                            <code class="text-sm font-mono text-white">/api/deployments</code>
+                            <span class="text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded">Protegido</span>
+                        </div>
+                        <p class="text-xs text-slate-300">Actualiza un despliegue indicando la aplicación y la provincia (admite nombres o IDs). Envía <code class="text-indigo-300">"N/A"</code> si no aplica.</p>
+                        <pre class="bg-slate-950 p-3 rounded-lg text-xs font-mono text-emerald-400 overflow-x-auto">curl -X POST http://localhost:3000/api/deployments \
+  -H "Content-Type: application/json" \
+  -H "x-api-key: version-hub-secret-2026" \
+  -d '{"appId": "SQL", "branchId": "Salta", "version": "v2.6.0"}'</pre>
+                    </div>
+
+                    <!-- Endpoint 3: Check Updates Online -->
+                    <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-sm space-y-4">
+                        <div class="flex items-center space-x-3">
+                            <span class="px-2.5 py-1 rounded-md text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">POST</span>
+                            <code class="text-sm font-mono text-white">/api/apps/check-updates</code>
+                            <span class="text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded">Protegido</span>
+                        </div>
+                        <p class="text-xs text-slate-300">Ejecuta la validación automática consultando las URLs de los repositorios configurados en cada aplicación.</p>
+                        <pre class="bg-slate-950 p-3 rounded-lg text-xs font-mono text-emerald-400 overflow-x-auto">curl -X POST http://localhost:3000/api/apps/check-updates \
+  -H "x-api-key: version-hub-secret-2026"</pre>
+                    </div>
+
+                    <!-- Endpoint 4: Check Province Updates JSON -->
+                    <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-sm space-y-4">
+                        <div class="flex items-center space-x-3">
+                            <span class="px-2.5 py-1 rounded-md text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">POST</span>
+                            <code class="text-sm font-mono text-white">/api/deployments/check-updates</code>
+                            <span class="text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded">Protegido</span>
+                        </div>
+                        <p class="text-xs text-slate-300">Consulta las URLs JSON configuradas en cada provincia para actualizar las versiones automáticamente.</p>
+                        <pre class="bg-slate-950 p-3 rounded-lg text-xs font-mono text-emerald-400 overflow-x-auto">curl -X POST http://localhost:3000/api/deployments/check-updates \
+  -H "x-api-key: version-hub-secret-2026"</pre>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 4: SETTINGS & REPORTS -->
+            <div x-show="currentTab === 'settings'" class="space-y-6" x-cloak>
+                <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-sm space-y-4">
+                    <h3 class="text-base font-bold text-white flex items-center space-x-2">
+                        <i data-lucide="mail" class="w-5 h-5 text-indigo-400"></i>
+                        <span>Correo del Administrador (Reportes Quincenales PDF)</span>
+                    </h3>
+                    <p class="text-xs text-slate-300">El reporte PDF automático de cada 15 días se enviará exclusivamente a la cuenta de correo configurada aquí:</p>
+                    <div class="flex flex-col sm:flex-row gap-3 max-w-xl">
+                        <input type="email" x-model="adminEmailInput" placeholder="admin@tudominio.com" class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500">
+                        <button @click="saveAdminEmail()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2.5 rounded-lg text-sm font-medium transition-all shadow-md">Guardar Correo</button>
+                    </div>
+                    <div class="pt-4 border-t border-slate-700 flex items-center justify-between">
+                        <span class="text-xs text-slate-400">¿Deseas probar el envío del informe PDF de inmediato?</span>
+                        <button @click="triggerManualReport()" class="bg-slate-700 hover:bg-slate-600 text-white text-xs px-4 py-2 rounded-lg font-medium transition-all">Enviar Reporte PDF Manual Ahora</button>
+                    </div>
+                </div>
+
+                <div class="bg-slate-950 border border-slate-800 rounded-2xl p-6 shadow-inner font-mono text-xs">
+                    <div class="flex items-center justify-between pb-3 mb-3 border-b border-slate-800">
+                        <span class="text-slate-400 font-semibold flex items-center space-x-2">
+                            <i data-lucide="terminal" class="w-4 h-4 text-emerald-400"></i>
+                            <span>Logs de Actividad SQLite</span>
+                        </span>
+                    </div>
+                    <div class="space-y-2 max-h-60 overflow-y-auto">
+                        <template x-for="log in logs" :key="log.time">
+                            <div class="flex space-x-3">
+                                <span class="text-slate-500" x-text="'[' + log.time + ']'"></span>
+                                <span class="text-emerald-400" x-text="log.msg"></span>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- MODAL: EDIT DEPLOYMENT VERSION -->
+    <div x-show="showDeployModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm" x-cloak>
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-md p-6 shadow-2xl">
+            <h3 class="text-lg font-bold text-white mb-2">Actualizar Versión en Provincia</h3>
+            <p class="text-xs text-slate-400 mb-4" x-text="selectedApp.name + ' en ' + selectedBranch.name"></p>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Versión Instalada Actual</label>
+                    <input type="text" x-model="modalVersion" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">URL JSON de la Provincia (Auto-Sync)</label>
+                    <input type="url" x-model="modalVersionUrl" placeholder="http://nginx-provincia-test/version.json" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500">
+                </div>
+                <div class="flex items-center space-x-2 pt-1">
+                    <button @click="modalVersion = 'N/A'" type="button" class="px-3 py-1 bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs rounded-md transition-colors">Marcar como No Aplica (N/A)</button>
+                </div>
+            </div>
+            <div class="mt-6 flex justify-end space-x-3">
+                <button @click="showDeployModal = false" class="bg-slate-700 hover:bg-slate-600 text-slate-200 px-4 py-2 rounded-lg text-sm font-medium">Cancelar</button>
+                <button @click="saveDeploymentVersion()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm font-medium">Guardar Versión</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: ADD / EDIT APP -->
+    <div x-show="showAppModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm" x-cloak>
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-md p-6 shadow-2xl">
+            <h3 class="text-lg font-bold text-white mb-2" x-text="isEditingApp ? 'Editar Aplicación' : 'Nueva Aplicación'"></h3>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Nombre</label>
+                    <input type="text" x-model="appForm.name" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Última Versión Oficial</label>
+                    <input type="text" x-model="appForm.latest" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Descripción</label>
+                    <input type="text" x-model="appForm.description" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">URL de Consulta de Versión (Auto-Check)</label>
+                    <input type="url" x-model="appForm.check_url" placeholder="https://api.github.com/repos/org/repo/releases/latest" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500">
+                </div>
+            </div>
+            <div class="mt-6 flex justify-end space-x-3">
+                <button @click="showAppModal = false" class="bg-slate-700 hover:bg-slate-600 text-slate-200 px-4 py-2 rounded-lg text-sm font-medium">Cancelar</button>
+                <button @click="saveApp()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm font-medium">Guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: ADD BRANCH -->
+    <div x-show="showBranchModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm" x-cloak>
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-md p-6 shadow-2xl">
+            <h3 class="text-lg font-bold text-white mb-2">Nueva Provincia</h3>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Nombre (ej. Córdoba)</label>
+                    <input type="text" x-model="branchForm.name" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Mail de contacto</label>
+                    <input type="email" x-model="branchForm.contactEmail" placeholder="contacto@provincia.gob.ar" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500">
+                </div>
+            </div>
+            <div class="mt-6 flex justify-end space-x-3">
+                <button @click="showBranchModal = false" class="bg-slate-700 hover:bg-slate-600 text-slate-200 px-4 py-2 rounded-lg text-sm font-medium">Cancelar</button>
+                <button @click="saveBranch()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm font-medium">Guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Script de conexión con la API Backend -->
+    <script>
+        document.addEventListener('alpine:init', () => {
+            Alpine.data('versionDashboard', () => ({
+                isAuthenticated: localStorage.getItem('version_hub_auth') === 'true',
+                apiKey: localStorage.getItem('version_hub_key') || 'version-hub-secret-2026',
+                passwordInput: '',
+                loginError: false,
+                currentTab: 'matrix',
+                searchQuery: '',
+                selectedProvinceFilter: '',
+                branches: [],
+                apps: [],
+                deployments: {},
+                deploymentUrls: {},
+                adminEmailInput: '',
+                logs: [],
+                showDeployModal: false,
+                selectedApp: {},
+                selectedBranch: {},
+                modalVersion: '',
+                modalVersionUrl: '',
+                showBranchModal: false,
+                branchForm: { name: '', contactEmail: '' },
+                showAppModal: false,
+                isEditingApp: false,
+                appForm: { id: '', name: '', latest: 'v1.0.0', description: '', check_url: '' },
+
+                get filteredApps() {
+                    if (!this.searchQuery) return this.apps;
+                    const q = this.searchQuery.toLowerCase();
+                    return this.apps.filter(app => app.name.toLowerCase().includes(q) || (app.description && app.description.toLowerCase().includes(q)));
+                },
+
+                get filteredBranches() {
+                    if (!this.selectedProvinceFilter) return this.branches;
+                    return this.branches.filter(branch => branch.id === this.selectedProvinceFilter);
+                },
+
+                async init() {
+                    if (this.isAuthenticated) {
+                        await this.fetchState();
+                    }
+                    setTimeout(() => { if (typeof lucide !== 'undefined') lucide.createIcons(); }, 100);
+                },
+
+                async login() {
+                    try {
+                        const res = await fetch('/api/login', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ password: this.passwordInput })
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            this.apiKey = data.apiKey;
+                            localStorage.setItem('version_hub_auth', 'true');
+                            localStorage.setItem('version_hub_key', data.apiKey);
+                            this.isAuthenticated = true;
+                            this.loginError = false;
+                            await this.fetchState();
+                            setTimeout(() => { if (typeof lucide !== 'undefined') lucide.createIcons(); }, 100);
+                        } else {
+                            this.loginError = true;
+                        }
+                    } catch (e) {
+                        this.loginError = true;
+                    }
+                },
+
+                logout() {
+                    localStorage.removeItem('version_hub_auth');
+                    localStorage.removeItem('version_hub_key');
+                    this.isAuthenticated = false;
+                    this.passwordInput = '';
+                },
+
+                async fetchState() {
+                    try {
+                        const res = await fetch('/api/state');
+                        const data = await res.json();
+                        this.branches = data.branches;
+                        this.apps = data.apps;
+                        this.deployments = data.deployments;
+                        this.deploymentUrls = data.deploymentUrls || {};
+                        if (data.settings && data.settings.admin_email) {
+                            this.adminEmailInput = data.settings.admin_email;
+                        }
+                        this.addLog('Estado sincronizado desde SQLite.');
+                    } catch (e) {
+                        this.addLog('Error al conectar con la API.');
+                    }
+                },
+
+                async saveAdminEmail() {
+                    try {
+                        const res = await fetch('/api/settings', {
+                            method: 'POST',
+                            headers: { 
+                                'Content-Type': 'application/json',
+                                'x-api-key': this.apiKey
+                            },
+                            body: JSON.stringify({ admin_email: this.adminEmailInput })
+                        });
+                        const data = await res.json();
+                        alert(data.message || 'Correo de administrador guardado correctamente.');
+                        this.addLog('Correo de administrador actualizado.');
+                    } catch (e) {
+                        alert('Error al guardar el correo de administrador.');
+                    }
+                },
+
+                async checkOnlineUpdates() {
+                    try {
+                        this.addLog('Consultando actualizaciones en repositorios externos...');
+                        const res = await fetch('/api/apps/check-updates', {
+                            method: 'POST',
+                            headers: { 'x-api-key': this.apiKey }
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            this.addLog(data.message);
+                            await this.fetchState();
+                        } else {
+                            this.addLog('Error al verificar actualizaciones online.');
+                        }
+                    } catch (e) {
+                        this.addLog('Error de red al intentar buscar actualizaciones.');
+                    }
+                },
+
+                async checkProvinceUpdates() {
+                    try {
+                        this.addLog('Sincronizando versiones desde endpoints JSON de provincias...');
+                        const res = await fetch('/api/deployments/check-updates', {
+                            method: 'POST',
+                            headers: { 'x-api-key': this.apiKey }
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            this.addLog(data.message);
+                            await this.fetchState();
+                        } else {
+                            this.addLog('Error al sincronizar con provincias.');
+                        }
+                    } catch (e) {
+                        this.addLog('Error de red al sincronizar provincias.');
+                    }
+                },
+
+                async triggerManualReport() {
+                    try {
+                        this.addLog('Enviando reporte PDF quincenal al administrador...');
+                        const res = await fetch('/api/reports/send', {
+                            method: 'POST',
+                            headers: { 'x-api-key': this.apiKey }
+                        });
+                        const data = await res.json();
+                        alert(data.message || 'Reporte enviado.');
+                        this.addLog(data.message || 'Reporte enviado.');
+                    } catch (e) {
+                        alert('Error al enviar el reporte PDF.');
+                    }
+                },
+
+                getVersion(appId, branchId) {
+                    return this.deployments[appId + '_' + branchId] || 'v1.0.0';
+                },
+
+                parseVersion(v) {
+                    if (!v || v.toUpperCase() === 'N/A' || v.toUpperCase() === 'NO APLICA') return null;
+                    const parts = v.replace(/^v/, '').split('.').map(p => parseInt(p, 10) || 0);
+                    while (parts.length < 3) parts.push(0);
+                    return parts;
+                },
+
+                compareVersions(current, latest) {
+                    const cur = this.parseVersion(current);
+                    const lat = this.parseVersion(latest);
+                    if (!cur || !lat) return 0;
+                    for (let i = 0; i < 3; i++) {
+                        if (cur[i] > lat[i]) return 1;  // Adelantada / Beta
+                        if (cur[i] < lat[i]) return -1; // Desactualizada
+                    }
+                    return 0; // Al día
+                },
+
+                getVersionStatus(latest, current) {
+                    if (!current || current.toUpperCase() === 'N/A' || current.toUpperCase() === 'NO APLICA') return 'na';
+                    const comp = this.compareVersions(current, latest);
+                    if (comp === 0) return 'ok';
+                    if (comp > 0) return 'ahead';
+                    return 'outdated';
+                },
+
+                countOutdated() {
+                    let count = 0;
+                    this.apps.forEach(app => {
+                        this.branches.forEach(branch => {
+                            const ver = this.getVersion(app.id, branch.id);
+                            if (this.getVersionStatus(app.latest, ver) === 'outdated') count++;
+                        });
+                    });
+                    return count;
+                },
+
+                getOutdatedPercentage() {
+                    const totalSlots = this.apps.length * this.branches.length;
+                    if (totalSlots === 0) return '0%';
+                    return ((this.countOutdated() / totalSlots) * 100).toFixed(1) + '%';
+                },
+
+                openEditDeployment(app, branch) {
+                    this.selectedApp = app;
+                    this.selectedBranch = branch;
+                    this.modalVersion = this.getVersion(app.id, branch.id);
+                    this.modalVersionUrl = this.deploymentUrls[app.id + '_' + branch.id] || '';
+                    this.showDeployModal = true;
+                },
+
+                async saveDeploymentVersion() {
+                    await fetch('/api/deployments', {
+                        method: 'POST',
+                        headers: { 
+                            'Content-Type': 'application/json',
+                            'x-api-key': this.apiKey
+                        },
+                        body: JSON.stringify({
+                            appId: this.selectedApp.id,
+                            branchId: this.selectedBranch.id,
+                            version: this.modalVersion,
+                            version_url: this.modalVersionUrl
+                        })
+                    });
+                    this.showDeployModal = false;
+                    await this.fetchState();
+                },
+
+                openBranchModal() {
+                    this.branchForm = { name: '', contactEmail: '' };
+                    this.showBranchModal = true;
+                },
+
+                async saveBranch() {
+                    if (!this.branchForm.name) return;
+                    await fetch('/api/branches', {
+                        method: 'POST',
+                        headers: { 
+                            'Content-Type': 'application/json',
+                            'x-api-key': this.apiKey
+                        },
+                        body: JSON.stringify(this.branchForm)
+                    });
+                    this.showBranchModal = false;
+                    await this.fetchState();
+                },
+
+                async deleteBranch(id) {
+                    await fetch(`/api/branches/${id}`, { 
+                        method: 'DELETE',
+                        headers: { 'x-api-key': this.apiKey }
+                    });
+                    await this.fetchState();
+                },
+
+                openAppModal() {
+                    this.isEditingApp = false;
+                    this.appForm = { id: '', name: '', latest: 'v1.0.0', description: '', check_url: '' };
+                    this.showAppModal = true;
+                },
+
+                openEditAppModal(app) {
+                    this.isEditingApp = true;
+                    this.appForm = { id: app.id, name: app.name, latest: app.latest, description: app.description || '', check_url: app.check_url || '' };
+                    this.showAppModal = true;
+                },
+
+                async saveApp() {
+                    if (!this.appForm.name) return;
+                    const url = this.isEditingApp ? `/api/apps/${this.appForm.id}` : '/api/apps';
+                    const method = this.isEditingApp ? 'PUT' : 'POST';
+
+                    await fetch(url, {
+                        method: method,
+                        headers: { 
+                            'Content-Type': 'application/json',
+                            'x-api-key': this.apiKey
+                        },
+                        body: JSON.stringify(this.appForm)
+                    });
+                    this.showAppModal = false;
+                    await this.fetchState();
+                },
+
+                async deleteApp(id) {
+                    await fetch(`/api/apps/${id}`, { 
+                        method: 'DELETE',
+                        headers: { 'x-api-key': this.apiKey }
+                    });
+                    await this.fetchState();
+                },
+
+                addLog(msg) {
+                    const now = new Date().toLocaleTimeString();
+                    this.logs.unshift({ time: now, msg });
+                }
+            }));
+        });
+    </script>
+</body>
+</html>

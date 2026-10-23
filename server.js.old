@@ -1,0 +1,172 @@
+const express = require('express');
+const sqlite3 = require('sqlite3').verbose();
+const path = require('path');
+const fs = require('fs');
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+app.use(express.json());
+app.use(express.static(path.join(__dirname, 'public')));
+
+const dbPath = path.join(__dirname, 'data', 'database.sqlite');
+if (!fs.existsSync(path.join(__dirname, 'data'))) {
+    fs.mkdirSync(path.join(__dirname, 'data'), { recursive: true });
+}
+
+const db = new sqlite3.Database(dbPath, (err) => {
+    if (err) {
+        console.error('Error al conectar con SQLite:', err.message);
+    } else {
+        console.log('Conectado a SQLite correctamente.');
+        initDatabase();
+    }
+});
+
+function initDatabase() {
+    db.serialize(() => {
+        db.run(`CREATE TABLE IF NOT EXISTS branches (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            region TEXT,
+            status TEXT DEFAULT 'healthy',
+            uptime TEXT DEFAULT '99.9%',
+            latency TEXT DEFAULT '45ms',
+            lastPing TEXT DEFAULT 'Hace un momento'
+        )`);
+
+        db.run(`CREATE TABLE IF NOT EXISTS apps (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            latest TEXT NOT NULL,
+            description TEXT
+        )`);
+
+        db.run(`CREATE TABLE IF NOT EXISTS deployments (
+            app_id TEXT,
+            branch_id TEXT,
+            version TEXT,
+            PRIMARY KEY (app_id, branch_id)
+        )`);
+
+        db.get("SELECT COUNT(*) as count FROM branches", (err, row) => {
+            if (row && row.count === 0) {
+                console.log('Poblando datos iniciales...');
+                db.run("INSERT INTO branches VALUES ('salta', 'Salta', 'NOA', 'healthy', '99.9%', '45ms', 'Hace 1 min')");
+                db.run("INSERT INTO branches VALUES ('tucuman', 'Tucumán', 'NOA', 'healthy', '99.8%', '52ms', 'Hace 2 min')");
+                db.run("INSERT INTO branches VALUES ('mendoza', 'Mendoza', 'Cuyo', 'healthy', '99.5%', '68ms', 'Hace 1 min')");
+
+                db.run("INSERT INTO apps VALUES ('app-portal', 'Portal Sucursales', 'v2.4.1', 'Frontend principal web')");
+                db.run("INSERT INTO apps VALUES ('app-api', 'API Transaccional', 'v1.8.0', 'Backend microservicios')");
+                db.run("INSERT INTO apps VALUES ('app-fiscal', 'Módulo Facturación', 'v3.1.2', 'Servicio AFIP local')");
+
+                const initialDeployments = [
+                    ['app-portal', 'salta', 'v2.4.1'], ['app-portal', 'tucuman', 'v2.3.0'], ['app-portal', 'mendoza', 'v2.4.1'],
+                    ['app-api', 'salta', 'v1.8.0'], ['app-api', 'tucuman', 'v1.7.5'], ['app-api', 'mendoza', 'v1.8.0'],
+                    ['app-fiscal', 'salta', 'v3.1.0'], ['app-fiscal', 'tucuman', 'v3.1.2'], ['app-fiscal', 'mendoza', 'v3.0.5']
+                ];
+                const stmt = db.prepare("INSERT INTO deployments VALUES (?, ?, ?)");
+                initialDeployments.forEach(dep => stmt.run(dep));
+                stmt.finalize();
+            }
+        });
+    });
+}
+
+// --- API REST ENDPOINTS ---
+
+app.get('/api/state', (req, res) => {
+    db.all("SELECT * FROM branches", (err, branches) => {
+        if (err) return res.status(500).json({ error: err.message });
+        db.all("SELECT * FROM apps", (err, apps) => {
+            if (err) return res.status(500).json({ error: err.message });
+            db.all("SELECT * FROM deployments", (err, deploymentsRows) => {
+                if (err) return res.status(500).json({ error: err.message });
+                const deployments = {};
+                deploymentsRows.forEach(row => {
+                    deployments[`${row.app_id}_${row.branch_id}`] = row.version;
+                });
+                res.json({ branches, apps, deployments });
+            });
+        });
+    });
+});
+
+// Endpoint Webhook para recibir reportes de Uptime Kuma (Soporta GET y POST)
+app.all('/api/kuma-webhook/:branchId', (req, res) => {
+    const { branchId } = req.params;
+    // Capturar parámetros tanto por query string como por el body JSON que manda Kuma por POST
+    const status = req.query.status || (req.body && req.body.status);
+    const latency = req.query.ping || (req.body && req.body.ping) || '45';
+    
+    const dbStatus = (status && (status.toUpperCase() === 'UP' || status === '1' || status === true)) ? 'healthy' : 'degraded';
+    const dbLatency = latency + 'ms';
+
+    db.run(`UPDATE branches SET status = ?, latency = ?, lastPing = datetime('now', 'localtime') WHERE id = ?`,
+        [dbStatus, dbLatency, branchId],
+        function(err) {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json({ success: true, message: `Sucursal ${branchId} actualizada desde Kuma.` });
+        }
+    );
+});
+
+app.post('/api/deployments', (req, res) => {
+    const { appId, branchId, version } = req.body;
+    db.run(`INSERT INTO deployments (app_id, branch_id, version) VALUES (?, ?, ?) 
+            ON CONFLICT(app_id, branch_id) DO UPDATE SET version = ?`,
+        [appId, branchId, version, version],
+        function(err) {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json({ success: true });
+        }
+    );
+});
+
+app.post('/api/branches', (req, res) => {
+    const { id, name, region } = req.body;
+    const branchId = id || name.toLowerCase().replace(/\s+/g, '-');
+    db.run(`INSERT INTO branches (id, name, region, status, uptime, latency, lastPing) VALUES (?, ?, ?, 'healthy', '100%', '50ms', 'Hace un momento')
+            ON CONFLICT(id) DO UPDATE SET name = ?, region = ?`,
+        [branchId, name, region, name, region],
+        function(err) {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json({ success: true, id: branchId });
+        }
+    );
+});
+
+app.delete('/api/branches/:id', (req, res) => {
+    const branchId = req.params.id;
+    db.run("DELETE FROM branches WHERE id = ?", [branchId], function(err) {
+        if (err) return res.status(500).json({ error: err.message });
+        db.run("DELETE FROM deployments WHERE branch_id = ?", [branchId]);
+        res.json({ success: true });
+    });
+});
+
+app.post('/api/apps', (req, res) => {
+    const { id, name, latest, description } = req.body;
+    const appId = id || 'app-' + Math.random().toString(36).substring(2, 7);
+    db.run(`INSERT INTO apps (id, name, latest, description) VALUES (?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET name = ?, latest = ?, description = ?`,
+        [appId, name, latest, description, name, latest, description],
+        function(err) {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json({ success: true, id: appId });
+        }
+    );
+});
+
+app.delete('/api/apps/:id', (req, res) => {
+    const appId = req.params.id;
+    db.run("DELETE FROM apps WHERE id = ?", [appId], function(err) {
+        if (err) return res.status(500).json({ error: err.message });
+        db.run("DELETE FROM deployments WHERE app_id = ?", [appId]);
+        res.json({ success: true });
+    });
+});
+
+app.listen(PORT, () => {
+    console.log(`Servidor corriendo en puerto ${PORT}`);
+});
