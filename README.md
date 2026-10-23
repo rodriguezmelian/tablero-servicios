@@ -1,2 +1,288 @@
-# tablero-servicios
-Tablero con estado de servicios.
+# Version Hub
+
+Sistema de control y monitoreo de versiones de aplicaciones por provincia/sucursal. El proyecto combina un backend en Node.js + Express, una base de datos SQLite persistente y un dashboard web para visualizar el estado real de cada aplicación en cada región.
+
+## ¿Qué hace?
+
+- Centraliza la versión actual de cada aplicación por provincia.
+- Permite administrar provincias y aplicaciones desde una interfaz web.
+- Muestra una matriz de versiones con estado visual:
+  - Verde: actualizado
+  - Amarillo: adelantado / beta
+  - Gris: no aplica
+  - Rojo: desactualizado
+- Soporta sincronización de versiones desde URLs JSON o endpoints remotos.
+- Genera un reporte PDF quincenal para el administrador.
+- Envía por email el reporte si se configura SMTP.
+- Persiste la información en SQLite para que el dashboard siga funcionando sin un servicio externo.
+
+## Stack tecnológico
+
+- Node.js
+- Express
+- SQLite3
+- PDFKit
+- Nodemailer
+- node-cron
+- Tailwind CSS + Alpine.js en el frontend
+
+## Requisitos previos
+
+- Node.js 18 o superior
+- npm
+- Opcional: Docker y Docker Compose
+
+## Instalación
+
+1. Cloná el repositorio:
+   ```bash
+   git clone <url-del-repo>
+   cd tablero-servicios
+   ```
+
+2. Instalá las dependencias:
+   ```bash
+   npm install
+   ```
+
+3. Creá la base de datos y ejecutá la app:
+   ```bash
+   npm start
+   ```
+
+La aplicación quedará disponible en:
+
+```bash
+http://localhost:3000
+```
+
+## Variables de entorno
+
+El proyecto usa estas variables opcionales:
+
+```bash
+PORT=3000
+API_KEY=tu-api-key-segura
+SMTP_HOST=smtp.tu-email.com
+SMTP_PORT=587
+SMTP_USER=usuario
+SMTP_PASS=contraseña
+```
+
+Si no se define `API_KEY`, el servidor usa un valor por defecto:
+
+```bash
+version-hub-secret-2026
+```
+
+> Se recomienda definir `API_KEY` explícitamente en producción y no dejarlo en código fuente.
+
+## Ejecutar con Docker
+
+El repositorio incluye un `docker-compose.yml` para levantar la app y un servicio `nginx` de prueba.
+
+### Levantar el entorno:
+
+```bash
+docker compose up --build -d
+```
+
+### Ver logs:
+
+```bash
+docker compose logs -f
+```
+
+### Detener el entorno:
+
+```bash
+docker compose down
+```
+
+> En algunos entornos puede ser necesario crear o adaptar `docker-compose.yml` a partir del archivo `docker-compose.temp.yml` y completar los valores reales, especialmente la API key.
+
+## Uso de la app
+
+### Login
+
+La interfaz web solicita una API Key para iniciar sesión.
+
+### Panel principal
+
+Desde el dashboard se puede:
+
+- Ver provincias activas
+- Ver aplicaciones monitoreadas
+- Consultar la matriz de versiones por provincia
+- Agregar/editar/eliminar provincias
+- Agregar/editar/eliminar aplicaciones
+- Sincronizar versiones desde URLs externas
+- Enviar reporte PDF al administrador
+- Configurar email del administrador
+
+## API REST
+
+La API expone endpoints básicos para gestionar el estado del sistema.
+
+### Autenticación
+
+La mayoría de los endpoints requieren la cabecera:
+
+```http
+x-api-key: <API_KEY>
+```
+
+### Endpoints principales
+
+#### Login
+```http
+POST /api/login
+```
+Body:
+```json
+{
+  "password": "tu-api-key"
+}
+```
+
+#### Estado general
+```http
+GET /api/state
+```
+
+#### Configuración del email administrador
+```http
+POST /api/settings
+```
+Body:
+```json
+{
+  "admin_email": "admin@ejemplo.com"
+}
+```
+
+#### Agregar/actualizar despliegue
+```http
+POST /api/deployments
+```
+Body:
+```json
+{
+  "appId": "app-rancher",
+  "branchId": "salta",
+  "version": "v2.1.0",
+  "version_url": "https://ejemplo.com/version.json"
+}
+```
+
+#### Agregar provincia
+```http
+POST /api/branches
+```
+Body:
+```json
+{
+  "name": "Salta",
+  "contactEmail": "contacto@salta.gob.ar"
+}
+```
+
+#### Eliminar provincia
+```http
+DELETE /api/branches/:id
+```
+
+#### Agregar aplicación
+```http
+POST /api/apps
+```
+Body:
+```json
+{
+  "name": "Rancher",
+  "latest": "v1.0.0",
+  "description": "Version 2025",
+  "check_url": "https://ejemplo.com/latest.json"
+}
+```
+
+#### Actualizar aplicación
+```http
+PUT /api/apps/:id
+```
+
+#### Eliminar aplicación
+```http
+DELETE /api/apps/:id
+```
+
+#### Verificación de versiones
+```http
+POST /api/apps/check-updates
+POST /api/deployments/check-updates
+```
+
+#### Enviar reporte manual
+```http
+POST /api/reports/send
+```
+
+## Persistencia y base de datos
+
+La aplicación crea y usa una base SQLite en:
+
+```bash
+./data/database.sqlite
+```
+
+Si la base no existe, se crea automáticamente al arrancar el servidor.
+
+## Estructura del proyecto
+
+```text
+.
+├── public/
+│   ├── index.html
+│   └── oldindex.html
+├── test/
+│   └── app.test.js
+├── data/
+│   └── database.sqlite (se crea automáticamente)
+├── .gitignore
+├── Dockerfile
+├── docker-compose.yml
+├── docker-compose.temp.yml
+├── package.json
+├── server.js
+├── version.json
+└── README.md
+```
+
+## Notas importantes
+
+- El tablero está pensado para uso interno / operativa.
+- La autenticación se basa en una API Key compartida; en producción conviene usar secretos del entorno o un mecanismo más robusto.
+- El reporte PDF se genera con el contenido actual de provincias, apps y despliegues.
+- Los emails de administrador se configuran a través de la base de datos y el endpoint de `settings`.
+- El proyecto incluye tests básicos de estructura, pero la lógica principal debe validarse con escenarios reales del dashboard.
+
+## Scripts disponibles
+
+```bash
+npm start
+npm test
+```
+
+## Sugerencia de uso recomendado
+
+1. Definir `API_KEY` en variables de entorno.
+2. Levantar la app localmente.
+3. Ingresar al dashboard.
+4. Registrar provincias y aplicaciones.
+5. Cargar versiones por cada provincia.
+6. Configurar el email del administrador.
+7. Dejar el cron para reportes quincenales activo.
+
+## Licencia
+
+Este proyecto no define una licencia específica en el repositorio. Revisá la política del equipo o del cliente antes de reutilizarlo en producción.
