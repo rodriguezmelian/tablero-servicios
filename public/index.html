@@ -131,6 +131,10 @@
                     <i data-lucide="grid" class="w-4 h-4"></i>
                     <span>Matriz de Versiones</span>
                 </button>
+                <button @click="currentTab = 'changelog'" :class="currentTab === 'changelog' ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-slate-400 hover:text-slate-200'" class="pb-3 border-b-2 font-medium text-sm transition-colors flex items-center space-x-2 whitespace-nowrap">
+                    <i data-lucide="git-pull-request" class="w-4 h-4"></i>
+                    <span>Changelog & Asistente IA</span>
+                </button>
                 <button x-show="userRole === 'admin'" @click="currentTab = 'crud'" :class="currentTab === 'crud' ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-slate-400 hover:text-slate-200'" class="pb-3 border-b-2 font-medium text-sm transition-colors flex items-center space-x-2 whitespace-nowrap">
                     <i data-lucide="sliders" class="w-4 h-4"></i>
                     <span>Gestión (Apps & Provincias)</span>
@@ -225,6 +229,126 @@
                                 </template>
                             </tbody>
                         </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB: CHANGELOG & AI ASSISTANT -->
+            <div x-show="currentTab === 'changelog'" class="space-y-6" x-cloak>
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    
+                    <!-- Columna Izquierda: Selector y Comparativa de Versiones -->
+                    <div class="lg:col-span-1 space-y-6">
+                        <div class="bg-slate-800 border border-slate-700 rounded-2xl p-5 shadow-sm space-y-4">
+                            <h3 class="text-sm font-bold text-white flex items-center space-x-2">
+                                <i data-lucide="sliders" class="w-4 h-4 text-indigo-400"></i>
+                                <span>Analizador de Migración</span>
+                            </h3>
+                            
+                            <div>
+                                <label class="block text-xs font-medium text-slate-300 mb-1">Seleccionar Provincia</label>
+                                <select x-model="selectedMigrateBranch" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500">
+                                    <option value="">-- Elige provincia --</option>
+                                    <template x-for="branch in branches" :key="branch.id">
+                                        <option :value="branch.id" x-text="branch.name"></option>
+                                    </template>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-medium text-slate-300 mb-1">Seleccionar Aplicación</label>
+                                <select x-model="selectedMigrateApp" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500">
+                                    <option value="">-- Elige aplicación --</option>
+                                    <template x-for="app in apps" :key="app.id">
+                                        <option :value="app.id" x-text="app.name"></option>
+                                    </template>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Tarjeta de Diagnóstico Rápido -->
+                        <template x-if="selectedMigrateBranch && selectedMigrateApp">
+                            <div class="bg-slate-800/90 border border-slate-700 rounded-2xl p-5 shadow-sm space-y-3">
+                                <h4 class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Estado del Salto</h4>
+                                <div class="flex justify-between items-center bg-slate-900/60 p-3 rounded-xl border border-slate-700/50">
+                                    <div>
+                                        <span class="text-[10px] text-slate-400 block">Versión Actual</span>
+                                        <span class="text-sm font-bold text-white" x-text="getVersion(selectedMigrateApp, selectedMigrateBranch)"></span>
+                                    </div>
+                                    <i data-lucide="arrow-right" class="w-4 h-4 text-indigo-400"></i>
+                                    <div>
+                                        <span class="text-[10px] text-slate-400 block">Versión Objetivo</span>
+                                        <span class="text-sm font-bold text-emerald-400" x-text="getAppLatest(selectedMigrateApp)"></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+
+                    <!-- Columna Derecha: Changelog, Tips y Chat IA -->
+                    <div class="lg:col-span-2 space-y-6">
+                        
+                        <!-- Changelog y Tips -->
+                        <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-sm space-y-6">
+                            <div class="flex items-center justify-between pb-4 border-b border-slate-700">
+                                <h3 class="text-base font-semibold text-white flex items-center space-x-2">
+                                    <i data-lucide="file-text" class="w-5 h-5 text-purple-400"></i>
+                                    <span>Notas de la Versión y Tips de Migración</span>
+                                </h3>
+                            </div>
+
+                            <template x-if="selectedMigrateApp">
+                                <div class="space-y-4">
+                                    <div>
+                                        <h4 class="text-xs font-semibold text-indigo-400 uppercase tracking-wider mb-2">Changelog Oficial</h4>
+                                        <div class="bg-slate-900/80 p-4 rounded-xl border border-slate-700 text-xs text-slate-300 font-mono whitespace-pre-line max-h-60 overflow-y-auto" x-text="getAppChangelog(selectedMigrateApp) || 'No hay changelog documentado para esta aplicación.'"></div>
+                                    </div>
+
+                                    <div>
+                                        <h4 class="text-xs font-semibold text-amber-400 uppercase tracking-wider mb-2">⚠️ Tips a tener en cuenta antes de migrar</h4>
+                                        <div class="bg-amber-500/10 border border-amber-500/20 p-4 rounded-xl text-xs text-amber-200/90 whitespace-pre-line" x-text="getAppTips(selectedMigrateApp) || 'No se especificaron precauciones especiales para esta versión.'"></div>
+                                    </div>
+                                </div>
+                            </template>
+                            <template x-if="!selectedMigrateApp">
+                                <p class="text-xs text-slate-400 text-center py-8">Selecciona una aplicación en el panel izquierdo para ver su changelog y recomendaciones.</p>
+                            </template>
+                        </div>
+
+                        <!-- Mini Chat con Agente de IA para Migración (Conectado a Gemini) -->
+                        <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-sm space-y-4">
+                            <div class="flex items-center space-x-2 pb-3 border-b border-slate-700">
+                                <div class="p-2 bg-indigo-600/20 text-indigo-400 rounded-lg"><i data-lucide="bot" class="w-5 h-5"></i></div>
+                                <div>
+                                    <h3 class="text-sm font-bold text-white">Asistente de Migración (Gemini IA)</h3>
+                                    <p class="text-[10px] text-slate-400">Análisis automático y resolución de dudas sobre incompatibilidades o rollback.</p>
+                                </div>
+                            </div>
+
+                            <!-- Historial de Conversación -->
+                            <div class="bg-slate-900/90 border border-slate-700/80 rounded-xl p-4 h-56 overflow-y-auto space-y-3 text-xs">
+                                <div class="flex space-x-2">
+                                    <span class="font-bold text-indigo-400">IA:</span>
+                                    <p class="text-slate-300">¡Hola! Selecciona una provincia y aplicación arriba para que realice el análisis automático del salto de versión.</p>
+                                </div>
+                                <template x-for="msg in chatMessages" :key="msg.text">
+                                    <div class="flex space-x-2" :class="msg.sender === 'user' ? 'justify-end' : ''">
+                                        <div :class="msg.sender === 'user' ? 'bg-indigo-600 text-white p-2.5 rounded-xl max-w-[85%]' : 'bg-slate-800 text-slate-200 p-2.5 rounded-xl max-w-[85%] border border-slate-750'">
+                                            <span class="whitespace-pre-line" x-text="msg.text"></span>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+
+                            <!-- Input del Chat -->
+                            <form @submit.prevent="sendAiMessage()" class="flex gap-2">
+                                <input type="text" x-model="chatInput" placeholder="Haz otra consulta o pide detalles adicionales..." class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500">
+                                <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-xs font-medium transition-all">
+                                    <i data-lucide="send" class="w-3.5 h-3.5"></i>
+                                </button>
+                            </form>
+                        </div>
+
                     </div>
                 </div>
             </div>
@@ -419,7 +543,7 @@
 
     <!-- MODAL: ADD / EDIT APP -->
     <div x-show="showAppModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm" x-cloak>
-        <div class="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-md p-6 shadow-2xl">
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-lg p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
             <h3 class="text-lg font-bold text-white mb-2" x-text="isEditingApp ? 'Editar Aplicación' : 'Nueva Aplicación'"></h3>
             <div class="space-y-4">
                 <div>
@@ -437,6 +561,14 @@
                 <div>
                     <label class="block text-xs font-medium text-slate-300 mb-1">URL de Consulta de Versión (Auto-Check)</label>
                     <input type="url" x-model="appForm.check_url" placeholder="https://api.github.com/repos/org/repo/releases/latest" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Changelog / Notas de Versión</label>
+                    <textarea x-model="appForm.changelog" rows="3" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500" placeholder="Detalles de la última versión..."></textarea>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Tips de Migración (Precauciones)</label>
+                    <textarea x-model="appForm.migration_tips" rows="3" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500" placeholder="Precauciones o pasos previos a tener en cuenta..."></textarea>
                 </div>
             </div>
             <div class="mt-6 flex justify-end space-x-3">
@@ -479,6 +611,10 @@
                 currentTab: 'matrix',
                 searchQuery: '',
                 selectedProvinceFilter: '',
+                selectedMigrateBranch: '',
+                selectedMigrateApp: '',
+                chatInput: '',
+                chatMessages: [],
                 branches: [],
                 apps: [],
                 deployments: {},
@@ -494,7 +630,7 @@
                 branchForm: { name: '', contactEmail: '' },
                 showAppModal: false,
                 isEditingApp: false,
-                appForm: { id: '', name: '', latest: 'v1.0.0', description: '', check_url: '' },
+                appForm: { id: '', name: '', latest: 'v1.0.0', description: '', check_url: '', changelog: '', migration_tips: '' },
 
                 get filteredApps() {
                     if (!this.searchQuery) return this.apps;
@@ -511,6 +647,19 @@
                     if (this.isAuthenticated) {
                         await this.fetchState();
                     }
+
+                    // Watchers automáticos para disparar el análisis con Gemini al cambiar provincia o app
+                    this.$watch('selectedMigrateBranch', (value) => {
+                        if (value && this.selectedMigrateApp) {
+                            this.triggerAutoAnalysis();
+                        }
+                    });
+                    this.$watch('selectedMigrateApp', (value) => {
+                        if (value && this.selectedMigrateBranch) {
+                            this.triggerAutoAnalysis();
+                        }
+                    });
+
                     setTimeout(() => { if (typeof lucide !== 'undefined') lucide.createIcons(); }, 100);
                 },
 
@@ -649,6 +798,94 @@
                     return this.deployments[appId + '_' + branchId] || 'v1.0.0';
                 },
 
+                getAppLatest(appId) {
+                    const app = this.apps.find(a => a.id === appId);
+                    return app ? app.latest : 'v1.0.0';
+                },
+
+                getAppChangelog(appId) {
+                    const app = this.apps.find(a => a.id === appId);
+                    return app ? app.changelog : '';
+                },
+
+                getAppTips(appId) {
+                    const app = this.apps.find(a => a.id === appId);
+                    return app ? app.migration_tips : '';
+                },
+
+                async triggerAutoAnalysis() {
+                    const app = this.apps.find(a => a.id === this.selectedMigrateApp);
+                    const branch = this.branches.find(b => b.id === this.selectedMigrateBranch);
+                    if (!app || !branch) return;
+
+                    const currentVer = this.getVersion(app.id, branch.id);
+                    const targetVer = app.latest;
+
+                    const promptText = `Actúa como un experto DevOps. Analiza automáticamente el salto de versión para la aplicación "${app.name}" desplegada en la provincia "${branch.name}". Versión actual: ${currentVer}, Versión objetivo (última): ${targetVer}. Changelog oficial: "${app.changelog || 'No especificado'}". Tips de migración y precauciones: "${app.migration_tips || 'Ninguno'}". Por favor, dame los pasos detallados a seguir para realizar esta migración de forma segura, incluyendo validaciones previas y un plan de rollback.`;
+
+                    this.chatMessages.push({ 
+                        sender: 'user', 
+                        text: `[Análisis Automático] Salto de ${app.name} en ${branch.name}: ${currentVer} ➔ ${targetVer}` 
+                    });
+
+                    const loadingIndex = this.chatMessages.push({ 
+                        sender: 'ai', 
+                        text: `Analizando el salto de ${currentVer} a ${targetVer} con Gemini...` 
+                    }) - 1;
+
+                    try {
+                        const res = await fetch('/api/ai/chat', {
+                            method: 'POST',
+                            headers: { 
+                                'Content-Type': 'application/json',
+                                'x-api-key': this.apiKey
+                            },
+                            body: JSON.stringify({ message: promptText })
+                        });
+                        const data = await res.json();
+                        
+                        if (res.ok && data.success) {
+                            this.chatMessages[loadingIndex] = { sender: 'ai', text: data.reply };
+                        } else {
+                            this.chatMessages[loadingIndex] = { sender: 'ai', text: 'Error: ' + (data.error || 'No se pudo procesar la respuesta automática.') };
+                        }
+                    } catch (e) {
+                        this.chatMessages[loadingIndex] = { sender: 'ai', text: 'Error de red al conectar con el servidor de IA para el análisis automático.' };
+                    }
+                    
+                    setTimeout(() => { if (typeof lucide !== 'undefined') lucide.createIcons(); }, 50);
+                },
+
+                async sendAiMessage() {
+                    if (!this.chatInput.trim()) return;
+                    const text = this.chatInput;
+                    this.chatMessages.push({ sender: 'user', text });
+                    this.chatInput = '';
+
+                    const loadingIndex = this.chatMessages.push({ sender: 'ai', text: 'Analizando con Gemini...' }) - 1;
+
+                    try {
+                        const res = await fetch('/api/ai/chat', {
+                            method: 'POST',
+                            headers: { 
+                                'Content-Type': 'application/json',
+                                'x-api-key': this.apiKey
+                            },
+                            body: JSON.stringify({ message: text })
+                        });
+                        const data = await res.json();
+                        
+                        if (res.ok && data.success) {
+                            this.chatMessages[loadingIndex] = { sender: 'ai', text: data.reply };
+                        } else {
+                            this.chatMessages[loadingIndex] = { sender: 'ai', text: 'Error: ' + (data.error || 'No se pudo procesar la respuesta.') };
+                        }
+                    } catch (e) {
+                        this.chatMessages[loadingIndex] = { sender: 'ai', text: 'Error de red al conectar con el servidor de IA.' };
+                    }
+                    setTimeout(() => { if (typeof lucide !== 'undefined') lucide.createIcons(); }, 50);
+                },
+
                 parseVersion(v) {
                     if (!v || v.toUpperCase() === 'N/A' || v.toUpperCase() === 'NO APLICA') return null;
                     const parts = v.replace(/^v/, '').split('.').map(p => parseInt(p, 10) || 0);
@@ -753,14 +990,14 @@
                 openAppModal() {
                     if (this.userRole !== 'admin') return;
                     this.isEditingApp = false;
-                    this.appForm = { id: '', name: '', latest: 'v1.0.0', description: '', check_url: '' };
+                    this.appForm = { id: '', name: '', latest: 'v1.0.0', description: '', check_url: '', changelog: '', migration_tips: '' };
                     this.showAppModal = true;
                 },
 
                 openEditAppModal(app) {
                     if (this.userRole !== 'admin') return;
                     this.isEditingApp = true;
-                    this.appForm = { id: app.id, name: app.name, latest: app.latest, description: app.description || '', check_url: app.check_url || '' };
+                    this.appForm = { id: app.id, name: app.name, latest: app.latest, description: app.description || '', check_url: app.check_url || '', changelog: app.changelog || '', migration_tips: app.migration_tips || '' };
                     this.showAppModal = true;
                 },
 

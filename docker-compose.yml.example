@@ -10,14 +10,16 @@ services:
     volumes:
       - ./data:/app/data
     environment:
-      - PORT=3000
-      - NODE_ENV=production
-      - API_KEY=
-      - SMTP_USER=gabriel
-      - SMTP_PASS=
-      - SMTP_HOST=
-      - SMTP_PORT=465
-      - VIEWER_KEY=
+      - PORT
+      - NODE_ENV
+      - API_KEY
+      - SMTP_USER
+      - SMTP_PASS
+      - SMTP_HOST
+      - SMTP_PORT
+      - VIEWER_KEY
+      - GEMINI_API_KEY
+
   nginx-provincia-test:
     image: nginx:alpine
     ports:

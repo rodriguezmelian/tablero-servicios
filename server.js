@@ -54,8 +54,14 @@ function initDb() {
             name TEXT NOT NULL,
             latest TEXT NOT NULL,
             description TEXT,
-            check_url TEXT
-        )`);
+            check_url TEXT,
+            changelog TEXT,
+            migration_tips TEXT
+        )`, () => {
+            // Asegurar columnas changelog y migration_tips si la tabla ya existía previamente
+            db.run(`ALTER TABLE apps ADD COLUMN changelog TEXT`, (err) => {});
+            db.run(`ALTER TABLE apps ADD COLUMN migration_tips TEXT`, (err) => {});
+        });
 
         db.run(`CREATE TABLE IF NOT EXISTS deployments (
             app_id TEXT,
@@ -93,11 +99,11 @@ function initDb() {
                 });
 
                 const defaultApps = [
-                    { id: 'app-rancher', name: 'Rancher', latest: 'v1.0.0', description: 'Version 2025', check_url: '' },
-                    { id: 'app-postgres', name: 'Postgres', latest: 'v3.0', description: 'Base de datos', check_url: '' }
+                    { id: 'app-rancher', name: 'Rancher', latest: 'v1.0.0', description: 'Version 2025', check_url: '', changelog: 'Versión inicial estable con soporte multinodo.', migration_tips: 'Verificar compatibilidad de certificados SSL.' },
+                    { id: 'app-postgres', name: 'Postgres', latest: 'v3.0', description: 'Base de datos', check_url: '', changelog: 'Optimización de índices y mejoras de rendimiento.', migration_tips: 'Realizar backup completo antes de aplicar el upgrade.' }
                 ];
                 defaultApps.forEach(a => {
-                    db.run(`INSERT INTO apps (id, name, latest, description, check_url) VALUES (?, ?, ?, ?, ?)`, [a.id, a.name, a.latest, a.description, a.check_url]);
+                    db.run(`INSERT INTO apps (id, name, latest, description, check_url, changelog, migration_tips) VALUES (?, ?, ?, ?, ?, ?, ?)`, [a.id, a.name, a.latest, a.description, a.check_url, a.changelog, a.migration_tips]);
                 });
             }
         });
@@ -231,6 +237,39 @@ app.get('/api/state', (req, res) => {
 });
 
 
+const { GoogleGenerativeAI } = require("@google/generative-ai");
+
+// Inicializar cliente de Gemini con la clave de entorno
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+
+// Endpoint para el chat con Inteligencia Artificial (Gemini)
+app.post('/api/ai/chat', authenticateApiKey, async (req, res) => {
+    const { message } = req.body;
+    if (!message) {
+        return res.status(400).json({ error: 'El mensaje es obligatorio' });
+    }
+
+    try {
+        // Usamos el modelo rápido y eficiente gemini-1.5-flash
+        const model = genAI.getGenerativeModel({ model: "gemini-3.8-flash" });
+        
+        // Contexto especializado para que actúe como asistente DevOps del Version Hub
+        const systemPrompt = `Eres un asistente experto en infraestructura, despliegues y DevOps para el tablero Version Hub de Gabriel. Ayuda de forma técnica, precisa y concisa con dudas sobre versiones, changelogs, migraciones o estrategias de rollback. Consulta del usuario: "${message}"`;
+
+        const result = await model.generateContent(systemPrompt);
+        const responseText = result.response.text();
+
+        res.json({ success: true, reply: responseText });
+    } catch (error) {
+        console.error('Error al consultar la API de Gemini:', error.message);
+        res.status(500).json({ error: 'Error al comunicarse con Gemini: ' + error.message });
+    }
+});
+
+
+
+
+
 // Actualizar configuración (Admin Email)
 app.post('/api/settings', authenticateApiKey, (req, res) => {
     const { admin_email } = req.body;
@@ -250,16 +289,37 @@ app.post('/api/apps/check-updates', authenticateApiKey, async (req, res) => {
                 const response = await fetch(app.check_url, { headers: { 'User-Agent': 'VersionHub-Bot' } });
                 if (response.ok) {
                     const contentType = response.headers.get('content-type');
-                    let newVersion = contentType && contentType.includes('application/json') ? (await response.json()).tag_name : (await response.text()).trim();
-                    if (newVersion && newVersion !== app.latest) {
-                        await new Promise(resolve => db.run(`UPDATE apps SET latest = ? WHERE id = ?`, [newVersion, app.id], () => { updatedCount++; resolve(); }));
+                    let newVersion = '';
+                    let newChangelog = '';
+                    
+                    if (contentType && contentType.includes('application/json')) {
+                        const data = await response.json();
+                        // Extrae la versión y las notas de la versión (changelog) del body de GitHub o JSON genérico
+                        newVersion = data.tag_name || data.version || data.latest || '';
+                        newChangelog = data.body || data.changelog || '';
+                    } else {
+                        newVersion = (await response.text()).trim();
+                    }
+
+                    // Si hay una versión nueva o el changelog cambió, actualizamos ambos campos en SQLite
+                    if (newVersion && (newVersion !== app.latest || !app.changelog)) {
+                        await new Promise(resolve => {
+                            db.run(
+                                `UPDATE apps SET latest = ?, changelog = ? WHERE id = ?`, 
+                                [newVersion, newChangelog || app.changelog, app.id], 
+                                () => { updatedCount++; resolve(); }
+                            );
+                        });
                     }
                 }
-            } catch (e) {}
+            } catch (e) {
+                console.error(`Error al verificar ${app.name}:`, e.message);
+            }
         }
-        res.json({ success: true, message: `Verificación global finalizada. ${updatedCount} actualizadas.` });
+        res.json({ success: true, message: `Verificación global finalizada. ${updatedCount} actualizadas con su changelog.` });
     });
 });
+
 
 app.post('/api/deployments/check-updates', authenticateApiKey, async (req, res) => {
     db.all(`SELECT * FROM deployments WHERE version_url IS NOT NULL AND version_url != ''`, [], async (err, deps) => {
@@ -280,8 +340,7 @@ app.post('/api/deployments/check-updates', authenticateApiKey, async (req, res) 
     });
 });
 
-
-// Endpoint corregido para guardar correctamente la version_url
+// Endpoint para guardar correctamente la version_url
 app.post('/api/deployments', authenticateApiKey, (req, res) => {
     let { appId, branchId, version, version_url } = req.body;
 
@@ -317,15 +376,20 @@ app.delete('/api/branches/:id', authenticateApiKey, (req, res) => {
     db.run(`DELETE FROM branches WHERE id = ?`, [req.params.id], () => res.json({ success: true }));
 });
 
+// Endpoints actualizados para soportar changelog y migration_tips
 app.post('/api/apps', authenticateApiKey, (req, res) => {
-    const { name, latest, description, check_url } = req.body;
+    const { name, latest, description, check_url, changelog, migration_tips } = req.body;
     const id = 'app-' + Math.random().toString(36).substring(2, 7);
-    db.run(`INSERT INTO apps (id, name, latest, description, check_url) VALUES (?, ?, ?, ?, ?)`, [id, name, latest || 'v1.0.0', description || '', check_url || ''], () => res.json({ success: true }));
+    db.run(`INSERT INTO apps (id, name, latest, description, check_url, changelog, migration_tips) VALUES (?, ?, ?, ?, ?, ?, ?)`, 
+        [id, name, latest || 'v1.0.0', description || '', check_url || '', changelog || '', migration_tips || ''], 
+        () => res.json({ success: true }));
 });
 
 app.put('/api/apps/:id', authenticateApiKey, (req, res) => {
-    const { name, latest, description, check_url } = req.body;
-    db.run(`UPDATE apps SET name = ?, latest = ?, description = ?, check_url = ? WHERE id = ?`, [name, latest, description || '', check_url || '', req.params.id], () => res.json({ success: true }));
+    const { name, latest, description, check_url, changelog, migration_tips } = req.body;
+    db.run(`UPDATE apps SET name = ?, latest = ?, description = ?, check_url = ?, changelog = ?, migration_tips = ? WHERE id = ?`, 
+        [name, latest, description || '', check_url || '', changelog || '', migration_tips || '', req.params.id], 
+        () => res.json({ success: true }));
 });
 
 app.delete('/api/apps/:id', authenticateApiKey, (req, res) => {

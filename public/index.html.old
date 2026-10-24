@@ -27,18 +27,18 @@
                     <i data-lucide="lock" class="w-8 h-8"></i>
                 </div>
                 <h1 class="text-xl font-bold text-white">Version Hub Login</h1>
-                <p class="text-xs text-slate-400">Ingresa la API Key de acceso para administrar el tablero.</p>
+                <p class="text-xs text-slate-400">Ingresa tu contraseña de acceso o lectura.</p>
             </div>
 
             <form @submit.prevent="login()" class="space-y-4">
                 <div>
-                    <label class="block text-xs font-medium text-slate-300 mb-1">Contraseña / API Key</label>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Contraseña</label>
                     <input type="password" x-model="passwordInput" placeholder="••••••••••••••••" required
                            class="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500">
                 </div>
 
                 <div x-show="loginError" class="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs rounded-lg text-center" x-cloak>
-                    Credenciales inválidas. Verifica tu API Key.
+                    Credenciales inválidas. Verifica tu contraseña.
                 </div>
 
                 <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-2.5 rounded-lg text-sm transition-all shadow-lg shadow-indigo-600/20">
@@ -62,15 +62,20 @@
                         <p class="text-xs text-slate-400">Control de Despliegues por Provincia (SQLite)</p>
                     </div>
                 </div>
-                <div class="flex items-center space-x-4">
-                    <button @click="checkOnlineUpdates()" class="flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-all shadow-md shadow-indigo-600/20">
-                        <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
-                        <span>Buscar Actualizaciones Online</span>
-                    </button>
-                    <div class="flex items-center space-x-2 bg-slate-900/60 px-3 py-1.5 rounded-lg border border-slate-700">
-                        <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                        <span class="text-xs font-medium text-slate-300">SQLite OK</span>
-                    </div>
+                <div class="flex items-center space-x-3">
+                    <!-- Botones de sincronización (Solo Administrador) -->
+                    <template x-if="userRole === 'admin'">
+                        <div class="flex items-center space-x-3">
+                            <button @click="checkProvinceUpdates()" class="flex items-center space-x-2 bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-all shadow-md">
+                                <i data-lucide="cloud-download" class="w-3.5 h-3.5"></i>
+                                <span>Sync Provincias JSON</span>
+                            </button>
+                            <button @click="checkOnlineUpdates()" class="flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-all shadow-md shadow-indigo-600/20">
+                                <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+                                <span>Sync Apps Online</span>
+                            </button>
+                        </div>
+                    </template>
                     <button @click="logout()" title="Cerrar sesión" class="p-2 bg-slate-700/50 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors">
                         <i data-lucide="log-out" class="w-4 h-4"></i>
                     </button>
@@ -108,10 +113,13 @@
                 <div class="bg-slate-800/80 backdrop-blur border border-slate-700/80 p-5 rounded-2xl shadow-sm">
                     <div class="flex items-center justify-between">
                         <span class="text-sm font-medium text-slate-400">Desactualizadas</span>
-                        <div class="p-2 bg-amber-500/10 text-amber-400 rounded-lg"><i data-lucide="alert-triangle" class="w-5 h-5"></i></div>
+                        <div class="p-2 bg-rose-500/10 text-rose-400 rounded-lg"><i data-lucide="alert-triangle" class="w-5 h-5"></i></div>
                     </div>
                     <div class="mt-4 flex items-baseline justify-between">
-                        <span class="text-2xl font-bold text-amber-400" x-text="countOutdated()"></span>
+                        <div class="flex items-baseline space-x-2">
+                            <span class="text-2xl font-bold text-rose-400" x-text="countOutdated()"></span>
+                            <span class="text-xs font-semibold text-rose-500/90 bg-rose-500/10 px-2 py-0.5 rounded-full" x-text="getOutdatedPercentage()"></span>
+                        </div>
                         <span class="text-xs text-slate-400">Requieren update</span>
                     </div>
                 </div>
@@ -123,7 +131,11 @@
                     <i data-lucide="grid" class="w-4 h-4"></i>
                     <span>Matriz de Versiones</span>
                 </button>
-                <button @click="currentTab = 'crud'" :class="currentTab === 'crud' ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-slate-400 hover:text-slate-200'" class="pb-3 border-b-2 font-medium text-sm transition-colors flex items-center space-x-2 whitespace-nowrap">
+                <button @click="currentTab = 'changelog'" :class="currentTab === 'changelog' ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-slate-400 hover:text-slate-200'" class="pb-3 border-b-2 font-medium text-sm transition-colors flex items-center space-x-2 whitespace-nowrap">
+                    <i data-lucide="git-pull-request" class="w-4 h-4"></i>
+                    <span>Changelog & Asistente IA</span>
+                </button>
+                <button x-show="userRole === 'admin'" @click="currentTab = 'crud'" :class="currentTab === 'crud' ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-slate-400 hover:text-slate-200'" class="pb-3 border-b-2 font-medium text-sm transition-colors flex items-center space-x-2 whitespace-nowrap">
                     <i data-lucide="sliders" class="w-4 h-4"></i>
                     <span>Gestión (Apps & Provincias)</span>
                 </button>
@@ -131,9 +143,9 @@
                     <i data-lucide="book-open" class="w-4 h-4"></i>
                     <span>Documentación API</span>
                 </button>
-                <button @click="currentTab = 'settings'" :class="currentTab === 'settings' ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-slate-400 hover:text-slate-200'" class="pb-3 border-b-2 font-medium text-sm transition-colors flex items-center space-x-2 whitespace-nowrap">
+                <button x-show="userRole === 'admin'" @click="currentTab = 'settings'" :class="currentTab === 'settings' ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-slate-400 hover:text-slate-200'" class="pb-3 border-b-2 font-medium text-sm transition-colors flex items-center space-x-2 whitespace-nowrap">
                     <i data-lucide="settings" class="w-4 h-4"></i>
-                    <span>Logs de Sincronización</span>
+                    <span>Configuración & Reportes</span>
                 </button>
             </div>
 
@@ -144,11 +156,23 @@
                         <h2 class="text-base font-semibold text-white">Matriz de Versiones por Provincia</h2>
                         <p class="text-xs text-slate-400">Verde: Al día | Amarillo: Adelantada/Beta | Gris: No Aplica (N/A) | Rojo: Desactualizada.</p>
                     </div>
-                    <!-- Buscador / Filtro Rápido -->
-                    <div class="w-full sm:w-72">
-                        <div class="relative">
-                            <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400"><i data-lucide="search" class="w-4 h-4"></i></span>
-                            <input type="text" x-model="searchQuery" placeholder="Filtrar tecnología..." class="w-full bg-slate-900 border border-slate-700 rounded-lg pl-9 pr-4 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500">
+                    <!-- Filtros Combinados (Provincia y Tecnología) -->
+                    <div class="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                        <!-- Selector de Provincia -->
+                        <div class="w-full sm:w-48">
+                            <select x-model="selectedProvinceFilter" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500">
+                                <option value="">Todas las provincias</option>
+                                <template x-for="branch in branches" :key="branch.id">
+                                    <option :value="branch.id" x-text="branch.name"></option>
+                                </template>
+                            </select>
+                        </div>
+                        <!-- Buscador de Tecnología -->
+                        <div class="w-full sm:w-64">
+                            <div class="relative">
+                                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400"><i data-lucide="search" class="w-4 h-4"></i></span>
+                                <input type="text" x-model="searchQuery" placeholder="Filtrar tecnología..." class="w-full bg-slate-900 border border-slate-700 rounded-lg pl-9 pr-4 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500">
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -160,7 +184,7 @@
                                 <tr class="bg-slate-900/60 border-b border-slate-700 text-xs font-semibold text-slate-400 uppercase tracking-wider">
                                     <th class="py-4 px-6">Aplicación / Repositorio</th>
                                     <th class="py-4 px-6 text-center">Última Versión</th>
-                                    <template x-for="branch in branches" :key="branch.id">
+                                    <template x-for="branch in filteredBranches" :key="branch.id">
                                         <th class="py-4 px-6 text-center" x-text="branch.name"></th>
                                     </template>
                                 </tr>
@@ -185,7 +209,7 @@
                                                 <span class="text-[10px] text-slate-500 truncate max-w-[120px]" x-text="app.check_url ? 'Auto-check ON' : ''"></span>
                                             </div>
                                         </td>
-                                        <template x-for="branch in branches" :key="branch.id">
+                                        <template x-for="branch in filteredBranches" :key="branch.id">
                                             <td class="py-4 px-6 text-center">
                                                 <div class="inline-flex flex-col items-center">
                                                     <span class="px-2.5 py-1 rounded-md text-xs font-medium border"
@@ -196,7 +220,8 @@
                                                               'bg-rose-500/15 text-rose-400 border-rose-500/30': getVersionStatus(app.latest, getVersion(app.id, branch.id)) === 'outdated'
                                                           }"
                                                           x-text="getVersion(app.id, branch.id)"></span>
-                                                    <button @click="openEditDeployment(app, branch)" class="mt-1 text-[10px] text-indigo-400 hover:underline">Editar</button>
+                                                    <!-- Botón Editar (Solo Administrador) -->
+                                                    <button x-show="userRole === 'admin'" @click="openEditDeployment(app, branch)" class="mt-1 text-[10px] text-indigo-400 hover:underline">Editar</button>
                                                 </div>
                                             </td>
                                         </template>
@@ -208,8 +233,128 @@
                 </div>
             </div>
 
-            <!-- TAB 2: CRUD MANAGEMENT -->
-            <div x-show="currentTab === 'crud'" class="space-y-8" x-cloak>
+            <!-- TAB: CHANGELOG & AI ASSISTANT -->
+            <div x-show="currentTab === 'changelog'" class="space-y-6" x-cloak>
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    
+                    <!-- Columna Izquierda: Selector y Comparativa de Versiones -->
+                    <div class="lg:col-span-1 space-y-6">
+                        <div class="bg-slate-800 border border-slate-700 rounded-2xl p-5 shadow-sm space-y-4">
+                            <h3 class="text-sm font-bold text-white flex items-center space-x-2">
+                                <i data-lucide="sliders" class="w-4 h-4 text-indigo-400"></i>
+                                <span>Analizador de Migración</span>
+                            </h3>
+                            
+                            <div>
+                                <label class="block text-xs font-medium text-slate-300 mb-1">Seleccionar Provincia</label>
+                                <select x-model="selectedMigrateBranch" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500">
+                                    <option value="">-- Elige provincia --</option>
+                                    <template x-for="branch in branches" :key="branch.id">
+                                        <option :value="branch.id" x-text="branch.name"></option>
+                                    </template>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-medium text-slate-300 mb-1">Seleccionar Aplicación</label>
+                                <select x-model="selectedMigrateApp" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500">
+                                    <option value="">-- Elige aplicación --</option>
+                                    <template x-for="app in apps" :key="app.id">
+                                        <option :value="app.id" x-text="app.name"></option>
+                                    </template>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Tarjeta de Diagnóstico Rápido -->
+                        <template x-if="selectedMigrateBranch && selectedMigrateApp">
+                            <div class="bg-slate-800/90 border border-slate-700 rounded-2xl p-5 shadow-sm space-y-3">
+                                <h4 class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Estado del Salto</h4>
+                                <div class="flex justify-between items-center bg-slate-900/60 p-3 rounded-xl border border-slate-700/50">
+                                    <div>
+                                        <span class="text-[10px] text-slate-400 block">Versión Actual</span>
+                                        <span class="text-sm font-bold text-white" x-text="getVersion(selectedMigrateApp, selectedMigrateBranch)"></span>
+                                    </div>
+                                    <i data-lucide="arrow-right" class="w-4 h-4 text-indigo-400"></i>
+                                    <div>
+                                        <span class="text-[10px] text-slate-400 block">Versión Objetivo</span>
+                                        <span class="text-sm font-bold text-emerald-400" x-text="getAppLatest(selectedMigrateApp)"></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+
+                    <!-- Columna Derecha: Changelog, Tips y Chat IA -->
+                    <div class="lg:col-span-2 space-y-6">
+                        
+                        <!-- Changelog y Tips -->
+                        <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-sm space-y-6">
+                            <div class="flex items-center justify-between pb-4 border-b border-slate-700">
+                                <h3 class="text-base font-semibold text-white flex items-center space-x-2">
+                                    <i data-lucide="file-text" class="w-5 h-5 text-purple-400"></i>
+                                    <span>Notas de la Versión y Tips de Migración</span>
+                                </h3>
+                            </div>
+
+                            <template x-if="selectedMigrateApp">
+                                <div class="space-y-4">
+                                    <div>
+                                        <h4 class="text-xs font-semibold text-indigo-400 uppercase tracking-wider mb-2">Changelog Oficial</h4>
+                                        <div class="bg-slate-900/80 p-4 rounded-xl border border-slate-700 text-xs text-slate-300 font-mono whitespace-pre-line max-h-60 overflow-y-auto" x-text="getAppChangelog(selectedMigrateApp) || 'No hay changelog documentado para esta aplicación.'"></div>
+                                    </div>
+
+                                    <div>
+                                        <h4 class="text-xs font-semibold text-amber-400 uppercase tracking-wider mb-2">⚠️ Tips a tener en cuenta antes de migrar</h4>
+                                        <div class="bg-amber-500/10 border border-amber-500/20 p-4 rounded-xl text-xs text-amber-200/90 whitespace-pre-line" x-text="getAppTips(selectedMigrateApp) || 'No se especificaron precauciones especiales para esta versión.'"></div>
+                                    </div>
+                                </div>
+                            </template>
+                            <template x-if="!selectedMigrateApp">
+                                <p class="text-xs text-slate-400 text-center py-8">Selecciona una aplicación en el panel izquierdo para ver su changelog y recomendaciones.</p>
+                            </template>
+                        </div>
+
+                        <!-- Mini Chat con Agente de IA para Migración (Conectado a Gemini) -->
+                        <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-sm space-y-4">
+                            <div class="flex items-center space-x-2 pb-3 border-b border-slate-700">
+                                <div class="p-2 bg-indigo-600/20 text-indigo-400 rounded-lg"><i data-lucide="bot" class="w-5 h-5"></i></div>
+                                <div>
+                                    <h3 class="text-sm font-bold text-white">Asistente de Migración (Gemini IA)</h3>
+                                    <p class="text-[10px] text-slate-400">Pregúntale dudas sobre incompatibilidades, breaking changes o pasos de rollback.</p>
+                                </div>
+                            </div>
+
+                            <!-- Historial de Conversación -->
+                            <div class="bg-slate-900/90 border border-slate-700/80 rounded-xl p-4 h-48 overflow-y-auto space-y-3 text-xs">
+                                <div class="flex space-x-2">
+                                    <span class="font-bold text-indigo-400">IA:</span>
+                                    <p class="text-slate-300">¡Hola! Selecciona una provincia y aplicación arriba, o consúltame directamente sobre cualquier duda de despliegue o migración.</p>
+                                </div>
+                                <template x-for="msg in chatMessages" :key="msg.text">
+                                    <div class="flex space-x-2" :class="msg.sender === 'user' ? 'justify-end' : ''">
+                                        <div :class="msg.sender === 'user' ? 'bg-indigo-600 text-white p-2.5 rounded-xl max-w-[80%]' : 'bg-slate-800 text-slate-200 p-2.5 rounded-xl max-w-[80%] border border-slate-700'">
+                                            <span x-text="msg.text"></span>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+
+                            <!-- Input del Chat -->
+                            <form @submit.prevent="sendAiMessage()" class="flex gap-2">
+                                <input type="text" x-model="chatInput" placeholder="Ej: ¿Qué precauciones debo tomar al actualizar?" class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500">
+                                <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-xs font-medium transition-all">
+                                    <i data-lucide="send" class="w-3.5 h-3.5"></i>
+                                </button>
+                            </form>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 2: CRUD MANAGEMENT (Solo Admin) -->
+            <div x-show="currentTab === 'crud' && userRole === 'admin'" class="space-y-8" x-cloak>
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
                     <!-- Branch CRUD -->
                     <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-sm">
@@ -270,7 +415,7 @@
                 </div>
             </div>
 
-            <!-- TAB 3: API DOCS (RESTAURADA Y COMPLETA) -->
+            <!-- TAB 3: API DOCS -->
             <div x-show="currentTab === 'docs'" class="space-y-6" x-cloak>
                 <div class="bg-slate-800/50 p-4 rounded-xl border border-slate-700/60 space-y-2">
                     <h2 class="text-base font-semibold text-white">Documentación de la API REST & Autenticación</h2>
@@ -318,38 +463,38 @@
   -H "x-api-key: version-hub-secret-2026"</pre>
                     </div>
 
-                    <!-- Endpoint 4: Create Branch -->
+                    <!-- Endpoint 4: Check Province Updates JSON -->
                     <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-sm space-y-4">
                         <div class="flex items-center space-x-3">
                             <span class="px-2.5 py-1 rounded-md text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">POST</span>
-                            <code class="text-sm font-mono text-white">/api/branches</code>
+                            <code class="text-sm font-mono text-white">/api/deployments/check-updates</code>
                             <span class="text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded">Protegido</span>
                         </div>
-                        <p class="text-xs text-slate-300">Registra una nueva provincia especificando su nombre y mail de contacto.</p>
-                        <pre class="bg-slate-950 p-3 rounded-lg text-xs font-mono text-emerald-400 overflow-x-auto">curl -X POST http://localhost:3000/api/branches \
-  -H "Content-Type: application/json" \
-  -H "x-api-key: version-hub-secret-2026" \
-  -d '{"name": "Córdoba", "contactEmail": "contacto@cordoba.gov.ar"}'</pre>
-                    </div>
-
-                    <!-- Endpoint 5: Create App -->
-                    <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-sm space-y-4">
-                        <div class="flex items-center space-x-3">
-                            <span class="px-2.5 py-1 rounded-md text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">POST</span>
-                            <code class="text-sm font-mono text-white">/api/apps</code>
-                            <span class="text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded">Protegido</span>
-                        </div>
-                        <p class="text-xs text-slate-300">Registra una nueva aplicación con su última versión oficial y URL opcional de verificación.</p>
-                        <pre class="bg-slate-950 p-3 rounded-lg text-xs font-mono text-emerald-400 overflow-x-auto">curl -X POST http://localhost:3000/api/apps \
-  -H "Content-Type: application/json" \
-  -H "x-api-key: version-hub-secret-2026" \
-  -d '{"name": "API Gateway", "latest": "v1.2.0", "description": "Servicio", "check_url": ""}'</pre>
+                        <p class="text-xs text-slate-300">Consulta las URLs JSON configuradas en cada provincia para actualizar las versiones automáticamente.</p>
+                        <pre class="bg-slate-950 p-3 rounded-lg text-xs font-mono text-emerald-400 overflow-x-auto">curl -X POST http://localhost:3000/api/deployments/check-updates \
+  -H "x-api-key: version-hub-secret-2026"</pre>
                     </div>
                 </div>
             </div>
 
-            <!-- TAB 4: SETTINGS & LOGS -->
-            <div x-show="currentTab === 'settings'" class="space-y-6" x-cloak>
+            <!-- TAB 4: SETTINGS & REPORTS (Solo Admin) -->
+            <div x-show="currentTab === 'settings' && userRole === 'admin'" class="space-y-6" x-cloak>
+                <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-sm space-y-4">
+                    <h3 class="text-base font-bold text-white flex items-center space-x-2">
+                        <i data-lucide="mail" class="w-5 h-5 text-indigo-400"></i>
+                        <span>Correo del Administrador (Reportes Quincenales PDF)</span>
+                    </h3>
+                    <p class="text-xs text-slate-300">El reporte PDF automático de cada 15 días se enviará exclusivamente a la cuenta de correo configurada aquí:</p>
+                    <div class="flex flex-col sm:flex-row gap-3 max-w-xl">
+                        <input type="email" x-model="adminEmailInput" placeholder="admin@tudominio.com" class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500">
+                        <button @click="saveAdminEmail()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2.5 rounded-lg text-sm font-medium transition-all shadow-md">Guardar Correo</button>
+                    </div>
+                    <div class="pt-4 border-t border-slate-700 flex items-center justify-between">
+                        <span class="text-xs text-slate-400">¿Deseas probar el envío del informe PDF de inmediato?</span>
+                        <button @click="triggerManualReport()" class="bg-slate-700 hover:bg-slate-600 text-white text-xs px-4 py-2 rounded-lg font-medium transition-all">Enviar Reporte PDF Manual Ahora</button>
+                    </div>
+                </div>
+
                 <div class="bg-slate-950 border border-slate-800 rounded-2xl p-6 shadow-inner font-mono text-xs">
                     <div class="flex items-center justify-between pb-3 mb-3 border-b border-slate-800">
                         <span class="text-slate-400 font-semibold flex items-center space-x-2">
@@ -381,6 +526,10 @@
                     <label class="block text-xs font-medium text-slate-300 mb-1">Versión Instalada Actual</label>
                     <input type="text" x-model="modalVersion" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500">
                 </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">URL JSON de la Provincia (Auto-Sync)</label>
+                    <input type="url" x-model="modalVersionUrl" placeholder="http://nginx-provincia-test/version.json" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500">
+                </div>
                 <div class="flex items-center space-x-2 pt-1">
                     <button @click="modalVersion = 'N/A'" type="button" class="px-3 py-1 bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs rounded-md transition-colors">Marcar como No Aplica (N/A)</button>
                 </div>
@@ -394,7 +543,7 @@
 
     <!-- MODAL: ADD / EDIT APP -->
     <div x-show="showAppModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm" x-cloak>
-        <div class="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-md p-6 shadow-2xl">
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-lg p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
             <h3 class="text-lg font-bold text-white mb-2" x-text="isEditingApp ? 'Editar Aplicación' : 'Nueva Aplicación'"></h3>
             <div class="space-y-4">
                 <div>
@@ -412,6 +561,14 @@
                 <div>
                     <label class="block text-xs font-medium text-slate-300 mb-1">URL de Consulta de Versión (Auto-Check)</label>
                     <input type="url" x-model="appForm.check_url" placeholder="https://api.github.com/repos/org/repo/releases/latest" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Changelog / Notas de Versión</label>
+                    <textarea x-model="appForm.changelog" rows="3" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500" placeholder="Detalles de la última versión..."></textarea>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Tips de Migración (Precauciones)</label>
+                    <textarea x-model="appForm.migration_tips" rows="3" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500" placeholder="Precauciones o pasos previos a tener en cuenta..."></textarea>
                 </div>
             </div>
             <div class="mt-6 flex justify-end space-x-3">
@@ -447,29 +604,43 @@
         document.addEventListener('alpine:init', () => {
             Alpine.data('versionDashboard', () => ({
                 isAuthenticated: localStorage.getItem('version_hub_auth') === 'true',
-                apiKey: localStorage.getItem('version_hub_key') || 'version-hub-secret-2026',
+                userRole: localStorage.getItem('version_hub_role') || 'admin',
+                apiKey: localStorage.getItem('version_hub_key') || '',
                 passwordInput: '',
                 loginError: false,
                 currentTab: 'matrix',
                 searchQuery: '',
+                selectedProvinceFilter: '',
+                selectedMigrateBranch: '',
+                selectedMigrateApp: '',
+                chatInput: '',
+                chatMessages: [],
                 branches: [],
                 apps: [],
                 deployments: {},
+                deploymentUrls: {},
+                adminEmailInput: '',
                 logs: [],
                 showDeployModal: false,
                 selectedApp: {},
                 selectedBranch: {},
                 modalVersion: '',
+                modalVersionUrl: '',
                 showBranchModal: false,
                 branchForm: { name: '', contactEmail: '' },
                 showAppModal: false,
                 isEditingApp: false,
-                appForm: { id: '', name: '', latest: 'v1.0.0', description: '', check_url: '' },
+                appForm: { id: '', name: '', latest: 'v1.0.0', description: '', check_url: '', changelog: '', migration_tips: '' },
 
                 get filteredApps() {
                     if (!this.searchQuery) return this.apps;
                     const q = this.searchQuery.toLowerCase();
                     return this.apps.filter(app => app.name.toLowerCase().includes(q) || (app.description && app.description.toLowerCase().includes(q)));
+                },
+
+                get filteredBranches() {
+                    if (!this.selectedProvinceFilter) return this.branches;
+                    return this.branches.filter(branch => branch.id === this.selectedProvinceFilter);
                 },
 
                 async init() {
@@ -488,11 +659,16 @@
                         });
                         const data = await res.json();
                         if (data.success) {
-                            this.apiKey = data.apiKey;
+                            this.userRole = data.role || 'admin';
+                            this.apiKey = data.apiKey || '';
                             localStorage.setItem('version_hub_auth', 'true');
-                            localStorage.setItem('version_hub_key', data.apiKey);
+                            localStorage.setItem('version_hub_role', this.userRole);
+                            localStorage.setItem('version_hub_key', this.apiKey);
                             this.isAuthenticated = true;
                             this.loginError = false;
+                            if (this.userRole === 'viewer' && (this.currentTab === 'crud' || this.currentTab === 'settings')) {
+                                this.currentTab = 'matrix';
+                            }
                             await this.fetchState();
                             setTimeout(() => { if (typeof lucide !== 'undefined') lucide.createIcons(); }, 100);
                         } else {
@@ -505,9 +681,12 @@
 
                 logout() {
                     localStorage.removeItem('version_hub_auth');
+                    localStorage.removeItem('version_hub_role');
                     localStorage.removeItem('version_hub_key');
                     this.isAuthenticated = false;
+                    this.userRole = 'admin';
                     this.passwordInput = '';
+                    this.currentTab = 'matrix';
                 },
 
                 async fetchState() {
@@ -517,13 +696,37 @@
                         this.branches = data.branches;
                         this.apps = data.apps;
                         this.deployments = data.deployments;
+                        this.deploymentUrls = data.deploymentUrls || {};
+                        if (data.settings && data.settings.admin_email) {
+                            this.adminEmailInput = data.settings.admin_email;
+                        }
                         this.addLog('Estado sincronizado desde SQLite.');
                     } catch (e) {
                         this.addLog('Error al conectar con la API.');
                     }
                 },
 
+                async saveAdminEmail() {
+                    if (this.userRole !== 'admin') return;
+                    try {
+                        const res = await fetch('/api/settings', {
+                            method: 'POST',
+                            headers: { 
+                                'Content-Type': 'application/json',
+                                'x-api-key': this.apiKey
+                            },
+                            body: JSON.stringify({ admin_email: this.adminEmailInput })
+                        });
+                        const data = await res.json();
+                        alert(data.message || 'Correo de administrador guardado correctamente.');
+                        this.addLog('Correo de administrador actualizado.');
+                    } catch (e) {
+                        alert('Error al guardar el correo de administrador.');
+                    }
+                },
+
                 async checkOnlineUpdates() {
+                    if (this.userRole !== 'admin') return;
                     try {
                         this.addLog('Consultando actualizaciones en repositorios externos...');
                         const res = await fetch('/api/apps/check-updates', {
@@ -542,8 +745,89 @@
                     }
                 },
 
+                async checkProvinceUpdates() {
+                    if (this.userRole !== 'admin') return;
+                    try {
+                        this.addLog('Sincronizando versiones desde endpoints JSON de provincias...');
+                        const res = await fetch('/api/deployments/check-updates', {
+                            method: 'POST',
+                            headers: { 'x-api-key': this.apiKey }
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            this.addLog(data.message);
+                            await this.fetchState();
+                        } else {
+                            this.addLog('Error al sincronizar con provincias.');
+                        }
+                    } catch (e) {
+                        this.addLog('Error de red al sincronizar provincias.');
+                    }
+                },
+
+                async triggerManualReport() {
+                    if (this.userRole !== 'admin') return;
+                    try {
+                        this.addLog('Enviando reporte PDF quincenal al administrador...');
+                        const res = await fetch('/api/reports/send', {
+                            method: 'POST',
+                            headers: { 'x-api-key': this.apiKey }
+                        });
+                        const data = await res.json();
+                        alert(data.message || 'Reporte enviado.');
+                        this.addLog(data.message || 'Reporte enviado.');
+                    } catch (e) {
+                        alert('Error al enviar el reporte PDF.');
+                    }
+                },
+
                 getVersion(appId, branchId) {
                     return this.deployments[appId + '_' + branchId] || 'v1.0.0';
+                },
+
+                getAppLatest(appId) {
+                    const app = this.apps.find(a => a.id === appId);
+                    return app ? app.latest : 'v1.0.0';
+                },
+
+                getAppChangelog(appId) {
+                    const app = this.apps.find(a => a.id === appId);
+                    return app ? app.changelog : '';
+                },
+
+                getAppTips(appId) {
+                    const app = this.apps.find(a => a.id === appId);
+                    return app ? app.migration_tips : '';
+                },
+
+                async sendAiMessage() {
+                    if (!this.chatInput.trim()) return;
+                    const text = this.chatInput;
+                    this.chatMessages.push({ sender: 'user', text });
+                    this.chatInput = '';
+
+                    const loadingIndex = this.chatMessages.push({ sender: 'ai', text: 'Analizando con Gemini...' }) - 1;
+
+                    try {
+                        const res = await fetch('/api/ai/chat', {
+                            method: 'POST',
+                            headers: { 
+                                'Content-Type': 'application/json',
+                                'x-api-key': this.apiKey
+                            },
+                            body: JSON.stringify({ message: text })
+                        });
+                        const data = await res.json();
+                        
+                        if (res.ok && data.success) {
+                            this.chatMessages[loadingIndex] = { sender: 'ai', text: data.reply };
+                        } else {
+                            this.chatMessages[loadingIndex] = { sender: 'ai', text: 'Error: ' + (data.error || 'No se pudo procesar la respuesta.') };
+                        }
+                    } catch (e) {
+                        this.chatMessages[loadingIndex] = { sender: 'ai', text: 'Error de red al conectar con el servidor de IA.' };
+                    }
+                    setTimeout(() => { if (typeof lucide !== 'undefined') lucide.createIcons(); }, 50);
                 },
 
                 parseVersion(v) {
@@ -583,14 +867,23 @@
                     return count;
                 },
 
+                getOutdatedPercentage() {
+                    const totalSlots = this.apps.length * this.branches.length;
+                    if (totalSlots === 0) return '0%';
+                    return ((this.countOutdated() / totalSlots) * 100).toFixed(1) + '%';
+                },
+
                 openEditDeployment(app, branch) {
+                    if (this.userRole !== 'admin') return;
                     this.selectedApp = app;
                     this.selectedBranch = branch;
                     this.modalVersion = this.getVersion(app.id, branch.id);
+                    this.modalVersionUrl = this.deploymentUrls[app.id + '_' + branch.id] || '';
                     this.showDeployModal = true;
                 },
 
                 async saveDeploymentVersion() {
+                    if (this.userRole !== 'admin') return;
                     await fetch('/api/deployments', {
                         method: 'POST',
                         headers: { 
@@ -600,7 +893,8 @@
                         body: JSON.stringify({
                             appId: this.selectedApp.id,
                             branchId: this.selectedBranch.id,
-                            version: this.modalVersion
+                            version: this.modalVersion,
+                            version_url: this.modalVersionUrl
                         })
                     });
                     this.showDeployModal = false;
@@ -608,11 +902,13 @@
                 },
 
                 openBranchModal() {
+                    if (this.userRole !== 'admin') return;
                     this.branchForm = { name: '', contactEmail: '' };
                     this.showBranchModal = true;
                 },
 
                 async saveBranch() {
+                    if (this.userRole !== 'admin') return;
                     if (!this.branchForm.name) return;
                     await fetch('/api/branches', {
                         method: 'POST',
@@ -627,6 +923,7 @@
                 },
 
                 async deleteBranch(id) {
+                    if (this.userRole !== 'admin') return;
                     await fetch(`/api/branches/${id}`, { 
                         method: 'DELETE',
                         headers: { 'x-api-key': this.apiKey }
@@ -635,18 +932,21 @@
                 },
 
                 openAppModal() {
+                    if (this.userRole !== 'admin') return;
                     this.isEditingApp = false;
-                    this.appForm = { id: '', name: '', latest: 'v1.0.0', description: '', check_url: '' };
+                    this.appForm = { id: '', name: '', latest: 'v1.0.0', description: '', check_url: '', changelog: '', migration_tips: '' };
                     this.showAppModal = true;
                 },
 
                 openEditAppModal(app) {
+                    if (this.userRole !== 'admin') return;
                     this.isEditingApp = true;
-                    this.appForm = { id: app.id, name: app.name, latest: app.latest, description: app.description || '', check_url: app.check_url || '' };
+                    this.appForm = { id: app.id, name: app.name, latest: app.latest, description: app.description || '', check_url: app.check_url || '', changelog: app.changelog || '', migration_tips: app.migration_tips || '' };
                     this.showAppModal = true;
                 },
 
                 async saveApp() {
+                    if (this.userRole !== 'admin') return;
                     if (!this.appForm.name) return;
                     const url = this.isEditingApp ? `/api/apps/${this.appForm.id}` : '/api/apps';
                     const method = this.isEditingApp ? 'PUT' : 'POST';
@@ -664,6 +964,7 @@
                 },
 
                 async deleteApp(id) {
+                    if (this.userRole !== 'admin') return;
                     await fetch(`/api/apps/${id}`, { 
                         method: 'DELETE',
                         headers: { 'x-api-key': this.apiKey }
