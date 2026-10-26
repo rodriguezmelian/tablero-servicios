@@ -5,6 +5,7 @@ const cors = require('cors');
 const cron = require('node-cron');
 const PDFDocument = require('pdfkit');
 const nodemailer = require('nodemailer');
+const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -58,7 +59,6 @@ function initDb() {
             changelog TEXT,
             migration_tips TEXT
         )`, () => {
-            // Asegurar columnas changelog y migration_tips si la tabla ya existía previamente
             db.run(`ALTER TABLE apps ADD COLUMN changelog TEXT`, (err) => {});
             db.run(`ALTER TABLE apps ADD COLUMN migration_tips TEXT`, (err) => {});
         });
@@ -70,11 +70,9 @@ function initDb() {
             version_url TEXT,
             PRIMARY KEY (app_id, branch_id)
         )`, () => {
-            // Asegurar columna version_url si la tabla ya existía previamente
             db.run(`ALTER TABLE deployments ADD COLUMN version_url TEXT`, (err) => {});
         });
 
-        // Tabla de configuración para el email del administrador
         db.run(`CREATE TABLE IF NOT EXISTS settings (
             key TEXT PRIMARY KEY,
             value TEXT
@@ -86,7 +84,6 @@ function initDb() {
             });
         });
 
-        // Datos iniciales si está vacía
         db.get(`SELECT COUNT(*) as count FROM branches`, (err, row) => {
             if (row.count === 0) {
                 const defaultBranches = [
@@ -109,7 +106,6 @@ function initDb() {
         });
     });
 
-    // Programar Tarea Automática Bi-quincenal (Días 1 y 16 de cada mes a las 08:00 AM)
     cron.schedule('0 8 1,16 * *', () => {
         console.log('[CRON] Ejecutando reporte automático quincenal...');
         sendBiWeeklyReport();
@@ -199,10 +195,9 @@ function sendBiWeeklyReport() {
 }
 
 // ================= API REST =================
-// Claves de acceso 
-const VIEWER_KEY = process.env.VIEWER_KEY || 'lectura2026'; // Contraseña para solo lectura
 
-// Único Endpoint de Login con soporte para Admin y Viewer
+const VIEWER_KEY = process.env.VIEWER_KEY || 'lectura2026';
+
 app.post('/api/login', (req, res) => {
     const { password } = req.body;
     if (password === API_KEY) {
@@ -236,13 +231,9 @@ app.get('/api/state', (req, res) => {
     });
 });
 
-
-const { GoogleGenerativeAI } = require("@google/generative-ai");
-
-// Inicializar cliente de Gemini con la clave de entorno
+// Inicializar cliente de Gemini con la clave de entorno y modelo correcto
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// Endpoint para el chat con Inteligencia Artificial (Gemini)
 app.post('/api/ai/chat', authenticateApiKey, async (req, res) => {
     const { message } = req.body;
     if (!message) {
@@ -250,10 +241,7 @@ app.post('/api/ai/chat', authenticateApiKey, async (req, res) => {
     }
 
     try {
-        // Usamos el modelo rápido y eficiente gemini-1.5-flash
-        const model = genAI.getGenerativeModel({ model: "gemini-3.8-flash" });
-        
-        // Contexto especializado para que actúe como asistente DevOps del Version Hub
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
         const systemPrompt = `Eres un asistente experto en infraestructura, despliegues y DevOps para el tablero Version Hub de Gabriel. Ayuda de forma técnica, precisa y concisa con dudas sobre versiones, changelogs, migraciones o estrategias de rollback. Consulta del usuario: "${message}"`;
 
         const result = await model.generateContent(systemPrompt);
@@ -266,15 +254,13 @@ app.post('/api/ai/chat', authenticateApiKey, async (req, res) => {
     }
 });
 
-// ================= ELIMINAR PROVINCIA POR API =================
+// ================= ELIMINAR PROVINCIA POR API (Con cascada) =================
 app.delete('/api/branches/:id', authenticateApiKey, (req, res) => {
     const branchParam = req.params.id;
     db.serialize(() => {
-        // Primero eliminamos los despliegues asociados a esta provincia
         db.run(`DELETE FROM deployments WHERE branch_id = ? OR branch_id IN (SELECT id FROM branches WHERE LOWER(name) = LOWER(?))`, [branchParam, branchParam], (err) => {
             if (err) return res.status(500).json({ error: err.message });
             
-            // Luego eliminamos la provincia por ID o por Nombre
             db.run(`DELETE FROM branches WHERE id = ? OR LOWER(name) = LOWER(?)`, [branchParam, branchParam], function(err) {
                 if (err) return res.status(500).json({ error: err.message });
                 if (this.changes === 0) {
@@ -286,15 +272,13 @@ app.delete('/api/branches/:id', authenticateApiKey, (req, res) => {
     });
 });
 
-// ================= ELIMINAR APLICACIÓN POR API =================
+// ================= ELIMINAR APLICACIÓN POR API (Con cascada) =================
 app.delete('/api/apps/:id', authenticateApiKey, (req, res) => {
     const appParam = req.params.id;
     db.serialize(() => {
-        // Primero eliminamos los despliegues asociados a esta aplicación
         db.run(`DELETE FROM deployments WHERE app_id = ? OR app_id IN (SELECT id FROM apps WHERE LOWER(name) = LOWER(?))`, [appParam, appParam], (err) => {
             if (err) return res.status(500).json({ error: err.message });
             
-            // Luego eliminamos la aplicación por ID o por Nombre
             db.run(`DELETE FROM apps WHERE id = ? OR LOWER(name) = LOWER(?)`, [appParam, appParam], function(err) {
                 if (err) return res.status(500).json({ error: err.message });
                 if (this.changes === 0) {
@@ -306,10 +290,6 @@ app.delete('/api/apps/:id', authenticateApiKey, (req, res) => {
     });
 });
 
-
-
-
-// Actualizar configuración (Admin Email)
 app.post('/api/settings', authenticateApiKey, (req, res) => {
     const { admin_email } = req.body;
     if (!admin_email) return res.status(400).json({ error: 'El email es obligatorio' });
@@ -333,14 +313,12 @@ app.post('/api/apps/check-updates', authenticateApiKey, async (req, res) => {
                     
                     if (contentType && contentType.includes('application/json')) {
                         const data = await response.json();
-                        // Extrae la versión y las notas de la versión (changelog) del body de GitHub o JSON genérico
                         newVersion = data.tag_name || data.version || data.latest || '';
                         newChangelog = data.body || data.changelog || '';
                     } else {
                         newVersion = (await response.text()).trim();
                     }
 
-                    // Si hay una versión nueva o el changelog cambió, actualizamos ambos campos en SQLite
                     if (newVersion && (newVersion !== app.latest || !app.changelog)) {
                         await new Promise(resolve => {
                             db.run(
@@ -358,7 +336,6 @@ app.post('/api/apps/check-updates', authenticateApiKey, async (req, res) => {
         res.json({ success: true, message: `Verificación global finalizada. ${updatedCount} actualizadas con su changelog.` });
     });
 });
-
 
 app.post('/api/deployments/check-updates', authenticateApiKey, async (req, res) => {
     db.all(`SELECT * FROM deployments WHERE version_url IS NOT NULL AND version_url != ''`, [], async (err, deps) => {
@@ -379,7 +356,6 @@ app.post('/api/deployments/check-updates', authenticateApiKey, async (req, res) 
     });
 });
 
-// Endpoint para guardar correctamente la version_url
 app.post('/api/deployments', authenticateApiKey, (req, res) => {
     let { appId, branchId, version, version_url } = req.body;
 
@@ -411,11 +387,6 @@ app.post('/api/branches', authenticateApiKey, (req, res) => {
     db.run(`INSERT OR REPLACE INTO branches (id, name, region) VALUES (?, ?, ?)`, [id, name, contactEmail || ''], () => res.json({ success: true }));
 });
 
-app.delete('/api/branches/:id', authenticateApiKey, (req, res) => {
-    db.run(`DELETE FROM branches WHERE id = ?`, [req.params.id], () => res.json({ success: true }));
-});
-
-// Endpoints actualizados para soportar changelog y migration_tips
 app.post('/api/apps', authenticateApiKey, (req, res) => {
     const { name, latest, description, check_url, changelog, migration_tips } = req.body;
     const id = 'app-' + Math.random().toString(36).substring(2, 7);
@@ -429,10 +400,6 @@ app.put('/api/apps/:id', authenticateApiKey, (req, res) => {
     db.run(`UPDATE apps SET name = ?, latest = ?, description = ?, check_url = ?, changelog = ?, migration_tips = ? WHERE id = ?`, 
         [name, latest, description || '', check_url || '', changelog || '', migration_tips || '', req.params.id], 
         () => res.json({ success: true }));
-});
-
-app.delete('/api/apps/:id', authenticateApiKey, (req, res) => {
-    db.run(`DELETE FROM apps WHERE id = ?`, [req.params.id], () => res.json({ success: true }));
 });
 
 app.post('/api/reports/send', authenticateApiKey, async (req, res) => {
