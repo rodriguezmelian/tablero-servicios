@@ -402,25 +402,85 @@ app.post('/api/deployments', authenticateApiKey, (req, res) => {
     });
 });
 
-app.post('/api/branches', authenticateApiKey, (req, res) => {
+app.post('/api/branches', async (req, res) => {
+    // Validar permisos de administrador si aplica...
     const { name, contactEmail } = req.body;
-    const id = name.toLowerCase().replace(/\s+/g, '-').normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-    db.run(`INSERT OR REPLACE INTO branches (id, name, region) VALUES (?, ?, ?)`, [id, name, contactEmail || ''], () => res.json({ success: true }));
+    if (!name || !name.trim()) {
+        return res.status(400).json({ success: false, error: 'El nombre de la provincia es obligatorio.' });
+    }
+
+    const trimmedName = name.trim();
+
+    // 1. Verificar si ya existe una provincia con el mismo nombre
+    db.get("SELECT id FROM branches WHERE LOWER(name) = LOWER(?)", [trimmedName], (err, row) => {
+        if (err) {
+            return res.status(500).json({ success: false, error: err.message });
+        }
+        if (row) {
+            return res.status(400).json({ success: false, error: 'Ya existe una provincia registrada con ese nombre.' });
+        }
+
+        // 2. Si no existe, proceder con la inserción
+        const id = trimmedName.toLowerCase().replace(/[^a-z0-9]/g, '-');
+        db.run("INSERT INTO branches (id, name, region) VALUES (?, ?, ?)", [id, trimmedName, contactEmail || ''], (err) => {
+            if (err) {
+                return res.status(500).json({ success: false, error: err.message });
+            }
+            res.json({ success: true, message: 'Provincia creada correctamente.' });
+        });
+    });
 });
 
-app.post('/api/apps', authenticateApiKey, (req, res) => {
+// CREAR APLICACIÓN NUEVA
+app.post('/api/apps', async (req, res) => {
     const { name, latest, description, check_url, changelog, migration_tips } = req.body;
-    const id = 'app-' + Math.random().toString(36).substring(2, 7);
-    db.run(`INSERT INTO apps (id, name, latest, description, check_url, changelog, migration_tips) VALUES (?, ?, ?, ?, ?, ?, ?)`, 
-        [id, name, latest || 'v1.0.0', description || '', check_url || '', changelog || '', migration_tips || ''], 
-        () => res.json({ success: true }));
+    if (!name || !name.trim()) {
+        return res.status(400).json({ success: false, error: 'El nombre de la aplicación es obligatorio.' });
+    }
+
+    const trimmedName = name.trim();
+
+    // 1. Verificar si ya existe una app con ese nombre
+    db.get("SELECT id FROM apps WHERE LOWER(name) = LOWER(?)", [trimmedName], (err, row) => {
+        if (err) return res.status(500).json({ success: false, error: err.message });
+        if (row) {
+            return res.status(400).json({ success: false, error: 'Ya existe una aplicación registrada con ese nombre.' });
+        }
+
+        // 2. Insertar
+        const id = 'app-' + trimmedName.toLowerCase().replace(/[^a-z0-9]/g, '-');
+        db.run(`INSERT INTO apps (id, name, latest, description, check_url, changelog, migration_tips) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            [id, trimmedName, latest || 'v1.0.0', description || '', check_url || '', changelog || '', migration_tips || ''], (err) => {
+                if (err) return res.status(500).json({ success: false, error: err.message });
+                res.json({ success: true, message: 'Aplicación creada correctamente.' });
+            });
+    });
 });
 
-app.put('/api/apps/:id', authenticateApiKey, (req, res) => {
+// ACTUALIZAR APLICACIÓN EXISTENTE
+app.put('/api/apps/:id', async (req, res) => {
+    const appId = req.params.id;
     const { name, latest, description, check_url, changelog, migration_tips } = req.body;
-    db.run(`UPDATE apps SET name = ?, latest = ?, description = ?, check_url = ?, changelog = ?, migration_tips = ? WHERE id = ?`, 
-        [name, latest, description || '', check_url || '', changelog || '', migration_tips || '', req.params.id], 
-        () => res.json({ success: true }));
+    if (!name || !name.trim()) {
+        return res.status(400).json({ success: false, error: 'El nombre de la aplicación es obligatorio.' });
+    }
+
+    const trimmedName = name.trim();
+
+    // 1. Verificar si otra aplicación diferente ya tiene ese nombre
+    db.get("SELECT id FROM apps WHERE LOWER(name) = LOWER(?) AND id != ?", [trimmedName, appId], (err, row) => {
+        if (err) return res.status(500).json({ success: false, error: err.message });
+        if (row) {
+            return res.status(400).json({ success: false, error: 'Ya existe otra aplicación con ese nombre.' });
+        }
+
+        // 2. Actualizar
+        db.run(`UPDATE apps SET name = ?, latest = ?, description = ?, check_url = ?, changelog = ?, migration_tips = ? WHERE id = ?`,
+            [trimmedName, latest, description, check_url, changelog, migration_tips, appId], (err) => {
+                if (err) return res.status(500).json({ success: false, error: err.message });
+                res.json({ success: true, message: 'Aplicación actualizada correctamente.' });
+            });
+    });
 });
 
 app.post('/api/reports/send', authenticateApiKey, async (req, res) => {
