@@ -266,6 +266,45 @@ app.post('/api/ai/chat', authenticateApiKey, async (req, res) => {
     }
 });
 
+// ================= ELIMINAR PROVINCIA POR API =================
+app.delete('/api/branches/:id', authenticateApiKey, (req, res) => {
+    const branchParam = req.params.id;
+    db.serialize(() => {
+        // Primero eliminamos los despliegues asociados a esta provincia
+        db.run(`DELETE FROM deployments WHERE branch_id = ? OR branch_id IN (SELECT id FROM branches WHERE LOWER(name) = LOWER(?))`, [branchParam, branchParam], (err) => {
+            if (err) return res.status(500).json({ error: err.message });
+            
+            // Luego eliminamos la provincia por ID o por Nombre
+            db.run(`DELETE FROM branches WHERE id = ? OR LOWER(name) = LOWER(?)`, [branchParam, branchParam], function(err) {
+                if (err) return res.status(500).json({ error: err.message });
+                if (this.changes === 0) {
+                    return res.status(404).json({ error: 'Provincia no encontrada' });
+                }
+                res.json({ success: true, message: 'Provincia y sus despliegues asociados eliminados correctamente.' });
+            });
+        });
+    });
+});
+
+// ================= ELIMINAR APLICACIÓN POR API =================
+app.delete('/api/apps/:id', authenticateApiKey, (req, res) => {
+    const appParam = req.params.id;
+    db.serialize(() => {
+        // Primero eliminamos los despliegues asociados a esta aplicación
+        db.run(`DELETE FROM deployments WHERE app_id = ? OR app_id IN (SELECT id FROM apps WHERE LOWER(name) = LOWER(?))`, [appParam, appParam], (err) => {
+            if (err) return res.status(500).json({ error: err.message });
+            
+            // Luego eliminamos la aplicación por ID o por Nombre
+            db.run(`DELETE FROM apps WHERE id = ? OR LOWER(name) = LOWER(?)`, [appParam, appParam], function(err) {
+                if (err) return res.status(500).json({ error: err.message });
+                if (this.changes === 0) {
+                    return res.status(404).json({ error: 'Aplicación no encontrada' });
+                }
+                res.json({ success: true, message: 'Aplicación y sus despliegues asociados eliminados correctamente.' });
+            });
+        });
+    });
+});
 
 
 

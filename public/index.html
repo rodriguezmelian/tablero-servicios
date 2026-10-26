@@ -463,7 +463,7 @@
   -H "x-api-key: version-hub-secret-2026"</pre>
                     </div>
 
-                    <!-- Endpoint 4: Check Province Updates JSON -->
+ <!-- Endpoint 4: Check Province Updates JSON -->
                     <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-sm space-y-4">
                         <div class="flex items-center space-x-3">
                             <span class="px-2.5 py-1 rounded-md text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">POST</span>
@@ -474,8 +474,30 @@
                         <pre class="bg-slate-950 p-3 rounded-lg text-xs font-mono text-emerald-400 overflow-x-auto">curl -X POST http://localhost:3000/api/deployments/check-updates \
   -H "x-api-key: version-hub-secret-2026"</pre>
                     </div>
-                </div>
-            </div>
+
+                    <!-- Endpoint 5: Delete Branch -->
+                    <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-sm space-y-4">
+                        <div class="flex items-center space-x-3">
+                            <span class="px-2.5 py-1 rounded-md text-xs font-bold bg-rose-500/10 text-rose-400 border border-rose-500/30">DELETE</span>
+                            <code class="text-sm font-mono text-white">/api/branches/:id</code>
+                            <span class="text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded">Protegido</span>
+                        </div>
+                        <p class="text-xs text-slate-300">Elimina una provincia y todos sus despliegues asociados (admite el ID o el nombre).</p>
+                        <pre class="bg-slate-950 p-3 rounded-lg text-xs font-mono text-emerald-400 overflow-x-auto">curl -X DELETE http://localhost:3000/api/branches/mendoza \
+  -H "x-api-key: version-hub-secret-2026"</pre>
+                    </div>
+
+                    <!-- Endpoint 6: Delete App -->
+                    <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-sm space-y-4">
+                        <div class="flex items-center space-x-3">
+                            <span class="px-2.5 py-1 rounded-md text-xs font-bold bg-rose-500/10 text-rose-400 border border-rose-500/30">DELETE</span>
+                            <code class="text-sm font-mono text-white">/api/apps/:id</code>
+                            <span class="text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded">Protegido</span>
+                        </div>
+                        <p class="text-xs text-slate-300">Elimina una aplicación y todos sus despliegues asociados (admite el ID o el nombre).</p>
+                        <pre class="bg-slate-950 p-3 rounded-lg text-xs font-mono text-emerald-400 overflow-x-auto">curl -X DELETE http://localhost:3000/api/apps/app-postgres \
+  -H "x-api-key: version-hub-secret-2026"</pre>
+                    </div>
 
             <!-- TAB 4: SETTINGS & REPORTS (Solo Admin) -->
             <div x-show="currentTab === 'settings' && userRole === 'admin'" class="space-y-6" x-cloak>
