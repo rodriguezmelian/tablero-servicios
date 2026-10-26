@@ -300,42 +300,63 @@ app.post('/api/settings', authenticateApiKey, (req, res) => {
     });
 });
 
-app.post('/api/apps/check-updates', authenticateApiKey, async (req, res) => {
-    db.all(`SELECT * FROM apps WHERE check_url IS NOT NULL AND check_url != ''`, [], async (err, apps) => {
-        let updatedCount = 0;
+app.post('/api/apps/check-updates', async (req, res) => {
+    try {
+        // Consultamos las aplicaciones con check_url directamente usando una Promesa para SQLite
+        const apps = await new Promise((resolve, reject) => {
+            db.all("SELECT * FROM apps WHERE check_url IS NOT NULL AND check_url != ''", [], (err, rows) => {
+                if (err) reject(err);
+                else resolve(rows || []);
+            });
+        });
+
         for (const app of apps) {
             try {
-                const response = await fetch(app.check_url, { headers: { 'User-Agent': 'VersionHub-Bot' } });
-                if (response.ok) {
-                    const contentType = response.headers.get('content-type');
-                    let newVersion = '';
-                    let newChangelog = '';
-                    
-                    if (contentType && contentType.includes('application/json')) {
-                        const data = await response.json();
-                        newVersion = data.tag_name || data.version || data.latest || '';
-                        newChangelog = data.body || data.changelog || '';
-                    } else {
-                        newVersion = (await response.text()).trim();
-                    }
+                const response = await fetch(app.check_url, {
+                    headers: { 'User-Agent': 'VersionHub-Bot' }
+                });
 
-                    if (newVersion && (newVersion !== app.latest || !app.changelog)) {
-                        await new Promise(resolve => {
-                            db.run(
-                                `UPDATE apps SET latest = ?, changelog = ? WHERE id = ?`, 
-                                [newVersion, newChangelog || app.changelog, app.id], 
-                                () => { updatedCount++; resolve(); }
-                            );
-                        });
+                let newVersion = '';
+                let newChangelog = '';
+
+                // Si la URL es la de PostgreSQL oficial (HTML)
+                if (app.check_url.includes('postgresql.org/docs/release')) {
+                    const htmlText = await response.text();
+                    const match = htmlText.match(/href="\/docs\/release\/(\d+(?:\.\d+)+)\/"/i) || 
+                                  htmlText.match(/>\s*PostgreSQL\s+(\d+(?:\.\d+)+)/i);
+                    
+                    if (match && match[1]) {
+                        newVersion = 'v' + match[1];
+                        newChangelog = `Obtenido automáticamente desde ${app.check_url}`;
                     }
+                } else {
+                    // Para APIs en formato JSON (GitHub, repos, etc.)
+                    const data = await response.json();
+                    newVersion = data.tag_name || data.latest || data.version || '';
+                    newChangelog = data.body || data.changelog || '';
                 }
-            } catch (e) {
-                console.error(`Error al verificar ${app.name}:`, e.message);
+
+                // Actualizamos la base de datos si encontramos una versión válida
+                if (newVersion) {
+                    await new Promise((resolve) => {
+                        db.run(`UPDATE apps SET latest = ?, changelog = ? WHERE id = ?`, 
+                            [newVersion, newChangelog, app.id], () => resolve());
+                    });
+                }
+
+            } catch (error) {
+                console.error(`Error al verificar la app ${app.name}:`, error.message);
             }
         }
-        res.json({ success: true, message: `Verificación global finalizada. ${updatedCount} actualizadas con su changelog.` });
-    });
+
+        res.json({ success: true, message: 'Actualizaciones verificadas correctamente.' });
+    } catch (error) {
+        console.error('Error general en check-updates:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
 });
+
+
 
 app.post('/api/deployments/check-updates', authenticateApiKey, async (req, res) => {
     db.all(`SELECT * FROM deployments WHERE version_url IS NOT NULL AND version_url != ''`, [], async (err, deps) => {
