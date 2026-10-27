@@ -170,7 +170,7 @@ async function createJiraIssue(ticketData, appName, branchName) {
                 fields: {
                     project: { key: projectKey },
                     summary: `[Version Hub] Migración ${appName} en ${branchName} (${ticketData.from_version} ➔ ${ticketData.to_version})`,
-                    description: `Ticket generado automáticamente desde Version Hub.\n\n• Aplicación: ${appName}\n• Provincia: ${branchName}\n• Versión origen: ${ticketData.from_version}\n• Versión objetivo: ${ticketData.to_version}`,
+                    description: `Ticket generado automáticamente desde Version Hub.\n\nAplicación: ${appName}\nProvincia: ${branchName}\nVersión origen: ${ticketData.from_version}\nVersión objetivo: ${ticketData.to_version}`,
                     issuetype: { name: 'Task' }
                 }
             })
@@ -397,14 +397,49 @@ app.post('/api/tickets', authenticateApiKey, async (req, res) => {
     });
 });
 
+// Validación contra la URL de Auto-Sync (version_url) de la aplicación en la provincia específica
 app.put('/api/tickets/:id/status', authenticateApiKey, (req, res) => {
     const { status } = req.body;
     if (!['Abierto', 'En proceso', 'Cerrado'].includes(status)) {
         return res.status(400).json({ error: 'Estado inválido.' });
     }
-    db.run(`UPDATE tickets SET status = ? WHERE id = ?`, [status, req.params.id], (err) => {
-        if (err) return res.status(500).json({ error: err.message });
-        res.json({ success: true, message: 'Estado actualizado.' });
+
+    const ticketId = req.params.id;
+
+    db.get(`SELECT * FROM tickets WHERE id = ?`, [ticketId], (err, ticket) => {
+        if (err || !ticket) {
+            return res.status(404).json({ error: 'Ticket no encontrado' });
+        }
+
+        db.run(`UPDATE tickets SET status = ? WHERE id = ?`, [status, ticketId], (err) => {
+            if (err) {
+                return res.status(500).json({ error: err.message });
+            }
+
+            // Si el ticket pasa a "Cerrado", validamos si la provincia tiene configurada su propia version_url
+            if (status === 'Cerrado') {
+                db.get(`SELECT * FROM deployments WHERE app_id = ? AND branch_id = ?`, [ticket.app_id, ticket.branch_id], (err, deployment) => {
+                    if (err || !deployment || !deployment.version_url || deployment.version_url.trim() === '') {
+                        db.run(
+                            `INSERT INTO deployments (app_id, branch_id, version) VALUES (?, ?, ?)
+                             ON CONFLICT(app_id, branch_id) DO UPDATE SET version = ?`,
+                            [ticket.app_id, ticket.branch_id, ticket.to_version, ticket.to_version],
+                            (err) => {
+                                if (err) {
+                                    console.error('Error al actualizar versión automática al cerrar ticket:', err);
+                                } else {
+                                    console.log(`[Auto-Update] App ${ticket.app_id} en provincia ${ticket.branch_id} actualizada a ${ticket.to_version} por cierre de ticket.`);
+                                }
+                            }
+                        );
+                    } else {
+                        console.log(`[Auto-Update Omitido] La provincia ${ticket.branch_id} tiene configurada una URL de Auto-Sync propia para esta app.`);
+                    }
+                });
+            }
+
+            res.json({ success: true, message: 'Estado actualizado correctamente.' });
+        });
     });
 });
 
