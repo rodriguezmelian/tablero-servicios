@@ -135,6 +135,10 @@
                     <i data-lucide="git-pull-request" class="w-4 h-4"></i>
                     <span>Changelog & Asistente IA</span>
                 </button>
+                <button @click="currentTab = 'tickets'" :class="currentTab === 'tickets' ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-slate-400 hover:text-slate-200'" class="pb-3 border-b-2 font-medium text-sm transition-colors flex items-center space-x-2 whitespace-nowrap">
+                    <i data-lucide="ticket" class="w-4 h-4"></i>
+                    <span>Tickets DevOps & Jira</span>
+                </button>
                 <button x-show="userRole === 'admin'" @click="currentTab = 'crud'" :class="currentTab === 'crud' ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-slate-400 hover:text-slate-200'" class="pb-3 border-b-2 font-medium text-sm transition-colors flex items-center space-x-2 whitespace-nowrap">
                     <i data-lucide="sliders" class="w-4 h-4"></i>
                     <span>Gestión (Apps & Provincias)</span>
@@ -349,6 +353,80 @@
                             </form>
                         </div>
 
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB: TICKETS DEVOPS -->
+            <div x-show="currentTab === 'tickets'" class="space-y-6" x-cloak>
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-800/50 p-4 rounded-xl border border-slate-700/60">
+                    <div>
+                        <h2 class="text-base font-semibold text-white">Gestión de Tickets DevOps & Jira</h2>
+                        <p class="text-xs text-slate-400">Control de migraciones, asignación de técnicos y comentarios de seguimiento.</p>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <!-- Botón para alternar visualización de tickets cerrados -->
+                        <button @click="showClosedTickets = !showClosedTickets" class="bg-slate-700 hover:bg-slate-600 text-white text-xs font-medium px-3 py-2 rounded-lg transition-all flex items-center space-x-1.5">
+                            <i data-lucide="eye" class="w-3.5 h-3.5" x-show="!showClosedTickets"></i>
+                            <i data-lucide="eye-off" class="w-3.5 h-3.5" x-show="showClosedTickets"></i>
+                            <span x-text="showClosedTickets ? 'Ocultar Cerrados' : 'Ver Cerrados'"></span>
+                        </button>
+                        <button x-show="userRole === 'admin'" @click="openTechModal()" class="bg-slate-700 hover:bg-slate-600 text-white text-xs font-medium px-3 py-2 rounded-lg transition-all">
+                            + Alta de Técnicos
+                        </button>
+                        <button @click="openTicketModal()" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium px-3 py-2 rounded-lg transition-all shadow-md">
+                            + Nuevo Ticket
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Lista de Tickets -->
+                <div class="bg-slate-800 border border-slate-700 rounded-2xl shadow-sm overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-slate-900/60 border-b border-slate-700 text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                                    <th class="py-3 px-4">ID / Jira</th>
+                                    <th class="py-3 px-4">Provincia</th>
+                                    <th class="py-3 px-4">Aplicación</th>
+                                    <th class="py-3 px-4">Salto Versión</th>
+                                    <th class="py-3 px-4">Estado</th>
+                                    <th class="py-3 px-4">Técnico</th>
+                                    <th class="py-3 px-4 text-center">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-700 text-xs">
+                                <template x-for="ticket in filteredTickets" :key="ticket.id">
+                                    <tr class="hover:bg-slate-700/30 transition-colors">
+                                        <td class="py-3 px-4 font-mono font-bold text-indigo-400" x-text="'#' + ticket.id + (ticket.jira_issue_key ? ' (' + ticket.jira_issue_key + ')' : '')"></td>
+                                        <td class="py-3 px-4 text-white font-medium" x-text="ticket.branch_name"></td>
+                                        <td class="py-3 px-4 text-slate-300" x-text="ticket.app_name"></td>
+                                        <td class="py-3 px-4 font-mono text-slate-300" x-text="ticket.from_version + ' ➔ ' + ticket.to_version"></td>
+                                        <td class="py-3 px-4">
+                                            <select @change="updateTicketStatus(ticket.id, $event.target.value)" class="border rounded px-2 py-1 text-xs font-medium focus:outline-none"
+                                                :class="{
+                                                    'bg-rose-500/15 text-rose-400 border-rose-500/30': ticket.status === 'Abierto',
+                                                    'bg-amber-500/15 text-amber-400 border-amber-500/30': ticket.status === 'En proceso',
+                                                    'bg-emerald-500/15 text-emerald-400 border-emerald-500/30': ticket.status === 'Cerrado'
+                                                }">
+                                                <option value="Abierto" class="bg-slate-900 text-rose-400" :selected="ticket.status === 'Abierto'">Abierto</option>
+                                                <option value="En proceso" class="bg-slate-900 text-amber-400" :selected="ticket.status === 'En proceso'">En proceso</option>
+                                                <option value="Cerrado" class="bg-slate-900 text-emerald-400" :selected="ticket.status === 'Cerrado'">Cerrado</option>
+                                            </select>
+                                        </td>
+                                        <td class="py-3 px-4 text-slate-300" x-text="ticket.technician_name || 'Sin asignar'"></td>
+                                        <td class="py-3 px-4 text-center">
+                                            <button @click="openTicketDetails(ticket)" class="bg-slate-700 hover:bg-slate-600 text-white px-2.5 py-1 rounded">Ver / Comentar</button>
+                                        </td>
+                                    </tr>
+                                </template>
+                                <template x-if="!filteredTickets || filteredTickets.length === 0">
+                                    <tr>
+                                        <td colspan="7" class="text-center py-6 text-slate-500">No hay tickets activos para mostrar.</td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
@@ -623,6 +701,116 @@
         </div>
     </div>
 
+    <!-- MODAL: NUEVO TICKET -->
+    <div x-show="showTicketModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm" x-cloak>
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-4">
+            <h3 class="text-lg font-bold text-white">Crear Ticket DevOps</h3>
+            <div>
+                <label class="block text-xs font-medium text-slate-300 mb-1">Provincia</label>
+                <select x-model="ticketForm.branchId" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white">
+                    <option value="">-- Seleccionar provincia --</option>
+                    <template x-for="branch in branches" :key="branch.id">
+                        <option :value="branch.id" x-text="branch.name"></option>
+                    </template>
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-slate-300 mb-1">Aplicación</label>
+                <select x-model="ticketForm.appId" @change="onTicketAppChange()" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white">
+                    <option value="">-- Seleccionar aplicación --</option>
+                    <template x-for="app in apps" :key="app.id">
+                        <option :value="app.id" x-text="app.name"></option>
+                    </template>
+                </select>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Versión Origen</label>
+                    <input type="text" x-model="ticketForm.fromVersion" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Versión Objetivo</label>
+                    <input type="text" x-model="ticketForm.toVersion" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white">
+                </div>
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-slate-300 mb-1">Técnico Asignado</label>
+                <select x-model="ticketForm.technicianId" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white">
+                    <option value="">-- Sin asignar --</option>
+                    <template x-for="tech in technicians" :key="tech.id">
+                        <option :value="tech.id" x-text="tech.name"></option>
+                    </template>
+                </select>
+            </div>
+            <div class="flex justify-end space-x-3 pt-2">
+                <button @click="showTicketModal = false" class="bg-slate-700 hover:bg-slate-600 text-slate-200 px-4 py-2 rounded-lg text-xs font-medium">Cancelar</button>
+                <button @click="saveTicket()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-xs font-medium">Crear Ticket & Jira</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: ALTA DE TÉCNICOS -->
+    <div x-show="showTechModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm" x-cloak>
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-sm p-6 shadow-2xl space-y-4">
+            <h3 class="text-lg font-bold text-white">Registrar Técnico</h3>
+            <div>
+                <label class="block text-xs font-medium text-slate-300 mb-1">Nombre</label>
+                <input type="text" x-model="techForm.name" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white">
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-slate-300 mb-1">Email</label>
+                <input type="email" x-model="techForm.email" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white">
+            </div>
+            <div class="flex justify-end space-x-3 pt-2">
+                <button @click="showTechModal = false" class="bg-slate-700 hover:bg-slate-600 text-slate-200 px-4 py-2 rounded-lg text-xs font-medium">Cerrar</button>
+                <button @click="saveTech()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-xs font-medium">Guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: DETALLES Y COMENTARIOS -->
+    <div x-show="showDetailsModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm" x-cloak>
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-lg p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-start">
+                <div>
+                    <h3 class="text-base font-bold text-white" x-text="'Ticket #' + activeTicket.id"></h3>
+                    <p class="text-xs text-indigo-400" x-text="activeTicket.branch_name + ' - ' + activeTicket.app_name"></p>
+                </div>
+                <span class="text-xs font-mono bg-slate-700 px-2 py-1 rounded text-slate-300" x-text="activeTicket.jira_issue_key || 'Sin Jira'"></span>
+            </div>
+            <div class="bg-slate-900/60 p-3 rounded-lg text-xs space-y-1">
+                <p><span class="text-slate-400">Salto:</span> <span class="font-mono text-white" x-text="activeTicket.from_version + ' ➔ ' + activeTicket.to_version"></span></p>
+                <p><span class="text-slate-400">Estado:</span> <span class="text-white font-medium" x-text="activeTicket.status"></span></p>
+                <p><span class="text-slate-400">Técnico Asignado:</span> <span class="text-white" x-text="activeTicket.technician_name || 'Sin asignar'"></span></p>
+            </div>
+            <div class="space-y-3">
+                <h4 class="text-xs font-semibold text-slate-300 uppercase">Comentarios de Seguimiento</h4>
+                <div class="space-y-2 max-h-40 overflow-y-auto bg-slate-900/90 p-3 rounded-lg text-xs">
+                    <template x-for="comm in activeTicket.comments" :key="comm.id">
+                        <div class="border-b border-slate-800 pb-2">
+                            <div class="flex justify-between text-[10px] text-slate-400">
+                                <span class="font-bold text-indigo-400" x-text="comm.technician_name"></span>
+                                <span x-text="new Date(comm.created_at).toLocaleString()"></span>
+                            </div>
+                            <p class="text-slate-200 mt-1" x-text="comm.comment"></p>
+                        </div>
+                    </template>
+                    <template x-if="!activeTicket.comments || activeTicket.comments.length === 0">
+                        <p class="text-slate-500 text-center py-2">No hay comentarios aún.</p>
+                    </template>
+                </div>
+                <div class="space-y-2">
+                    <input type="text" x-model="newCommentTech" placeholder="Tu nombre o técnico..." class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-xs text-white">
+                    <textarea x-model="newCommentText" rows="2" placeholder="Escribe un comentario..." class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-xs text-white"></textarea>
+                    <button @click="addComment()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-1.5 rounded text-xs font-medium">Agregar Comentario</button>
+                </div>
+            </div>
+            <div class="flex justify-end pt-2">
+                <button @click="showDetailsModal = false" class="bg-slate-700 hover:bg-slate-600 text-slate-200 px-4 py-2 rounded-lg text-xs font-medium">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Script de conexión con la API Backend -->
     <script>
         document.addEventListener('alpine:init', () => {
@@ -643,6 +831,9 @@
                 apps: [],
                 deployments: {},
                 deploymentUrls: {},
+                tickets: [],
+                technicians: [],
+                showClosedTickets: false, // Variable para alternar la vista de tickets cerrados
                 adminEmailInput: '',
                 logs: [],
                 showDeployModal: false,
@@ -655,6 +846,14 @@
                 showAppModal: false,
                 isEditingApp: false,
                 appForm: { id: '', name: '', latest: 'v1.0.0', description: '', check_url: '', changelog: '', migration_tips: '' },
+                showTicketModal: false,
+                showTechModal: false,
+                showDetailsModal: false,
+                activeTicket: {},
+                ticketForm: { appId: '', branchId: '', fromVersion: '', toVersion: '', technicianId: '' },
+                techForm: { name: '', email: '' },
+                newCommentTech: '',
+                newCommentText: '',
 
                 get filteredApps() {
                     if (!this.searchQuery) return this.apps;
@@ -667,12 +866,17 @@
                     return this.branches.filter(branch => branch.id === this.selectedProvinceFilter);
                 },
 
+                get filteredTickets() {
+                    if (this.showClosedTickets) return this.tickets;
+                    return this.tickets.filter(t => t.status !== 'Cerrado');
+                },
+
                 async init() {
                     if (this.isAuthenticated) {
                         await this.fetchState();
+                        await this.fetchTicketsAndTechs();
                     }
 
-                    // Watchers automáticos para disparar el análisis con Gemini al cambiar provincia o app
                     this.$watch('selectedMigrateBranch', (value) => {
                         if (value && this.selectedMigrateApp) {
                             this.triggerAutoAnalysis();
@@ -707,6 +911,7 @@
                                 this.currentTab = 'matrix';
                             }
                             await this.fetchState();
+                            await this.fetchTicketsAndTechs();
                             setTimeout(() => { if (typeof lucide !== 'undefined') lucide.createIcons(); }, 100);
                         } else {
                             this.loginError = true;
@@ -740,6 +945,105 @@
                         this.addLog('Estado sincronizado desde SQLite.');
                     } catch (e) {
                         this.addLog('Error al conectar con la API.');
+                    }
+                },
+
+                async fetchTicketsAndTechs() {
+                    try {
+                        const [resT, resTech] = await Promise.all([
+                            fetch('/api/tickets'),
+                            fetch('/api/technicians')
+                        ]);
+                        this.tickets = await resT.json();
+                        this.technicians = await resTech.json();
+                    } catch (e) {
+                        console.error('Error al cargar tickets o técnicos');
+                    }
+                },
+
+                openTicketModal() {
+                    this.ticketForm = { appId: '', branchId: '', fromVersion: '', toVersion: '', technicianId: '' };
+                    this.showTicketModal = true;
+                },
+
+                onTicketAppChange() {
+                    const app = this.apps.find(a => a.id === this.ticketForm.appId);
+                    if (app) {
+                        this.ticketForm.toVersion = app.latest;
+                        if (this.ticketForm.branchId) {
+                            this.ticketForm.fromVersion = this.getVersion(app.id, this.ticketForm.branchId);
+                        }
+                    }
+                },
+
+                async saveTicket() {
+                    if (!this.ticketForm.appId || !this.ticketForm.branchId) {
+                        alert('Selecciona aplicación y provincia.');
+                        return;
+                    }
+                    const res = await fetch('/api/tickets', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'x-api-key': this.apiKey },
+                        body: JSON.stringify(this.ticketForm)
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        alert(data.message);
+                        this.showTicketModal = false;
+                        await this.fetchTicketsAndTechs();
+                    } else {
+                        alert('Error: ' + data.error);
+                    }
+                },
+
+                async updateTicketStatus(ticketId, newStatus) {
+                    await fetch(`/api/tickets/${ticketId}/status`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json', 'x-api-key': this.apiKey },
+                        body: JSON.stringify({ status: newStatus })
+                    });
+                    await this.fetchTicketsAndTechs();
+                },
+
+                openTechModal() {
+                    this.techForm = { name: '', email: '' };
+                    this.showTechModal = true;
+                },
+
+                async saveTech() {
+                    if (!this.techForm.name) return;
+                    const res = await fetch('/api/technicians', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'x-api-key': this.apiKey },
+                        body: JSON.stringify(this.techForm)
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        this.showTechModal = false;
+                        await this.fetchTicketsAndTechs();
+                    } else {
+                        alert(data.error);
+                    }
+                },
+
+                openTicketDetails(ticket) {
+                    this.activeTicket = ticket;
+                    this.newCommentTech = '';
+                    this.newCommentText = '';
+                    this.showDetailsModal = true;
+                },
+
+                async addComment() {
+                    if (!this.newCommentText.trim()) return;
+                    const res = await fetch(`/api/tickets/${this.activeTicket.id}/comments`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'x-api-key': this.apiKey },
+                        body: JSON.stringify({ technicianName: this.newCommentTech, comment: this.newCommentText })
+                    });
+                    if (res.ok) {
+                        await this.fetchTicketsAndTechs();
+                        this.activeTicket = this.tickets.find(t => t.id === this.activeTicket.id);
+                        this.newCommentText = '';
                     }
                 },
 

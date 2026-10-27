@@ -84,6 +84,33 @@ function initDb() {
             });
         });
 
+        // Nuevas tablas para la gestión de Tickets y Técnicos (DevOps)
+        db.run(`CREATE TABLE IF NOT EXISTS technicians (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            email TEXT
+        )`);
+
+        db.run(`CREATE TABLE IF NOT EXISTS tickets (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            app_id TEXT NOT NULL,
+            branch_id TEXT NOT NULL,
+            from_version TEXT NOT NULL,
+            to_version TEXT NOT NULL,
+            status TEXT DEFAULT 'Abierto',
+            technician_id TEXT,
+            jira_issue_key TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )`);
+
+        db.run(`CREATE TABLE IF NOT EXISTS ticket_comments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ticket_id INTEGER,
+            technician_name TEXT,
+            comment TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )`);
+
         db.get(`SELECT COUNT(*) as count FROM branches`, (err, row) => {
             if (row.count === 0) {
                 const defaultBranches = [
@@ -118,6 +145,50 @@ function authenticateApiKey(req, res, next) {
         return res.status(401).json({ error: 'No autorizado. Se requiere API Key.' });
     }
     next();
+}
+
+// ================= INTEGRACIÓN CON JIRA =================
+async function createJiraIssue(ticketData, appName, branchName) {
+    const jiraUrl = process.env.JIRA_URL; 
+    const jiraUser = process.env.JIRA_USER; 
+    const jiraToken = process.env.JIRA_API_TOKEN; 
+    const projectKey = process.env.JIRA_PROJECT_KEY || 'DEVOPS';
+
+    if (!jiraUrl || !jiraUser || !jiraToken) {
+        console.log('[Jira] Credenciales no configuradas. Omitiendo creación automática en Jira.');
+        return null;
+    }
+
+    try {
+        const response = await fetch(`${jiraUrl}/rest/api/2/issue`, {
+            method: 'POST',
+            headers: {
+                'Authorization': 'Basic ' + Buffer.from(`${jiraUser}:${jiraToken}`).toString('base64'),
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                fields: {
+                    project: { key: projectKey },
+                    summary: `[Version Hub] Migración ${appName} en ${branchName} (${ticketData.from_version} ➔ ${ticketData.to_version})`,
+                    description: `Ticket generado automáticamente desde Version Hub.\n\n• Aplicación: ${appName}\n• Provincia: ${branchName}\n• Versión origen: ${ticketData.from_version}\n• Versión objetivo: ${ticketData.to_version}`,
+                    issuetype: { name: 'Task' }
+                }
+            })
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            console.log(`[Jira] Tarea creada con éxito: ${data.key}`);
+            return data.key;
+        } else {
+            const errText = await response.text();
+            console.error('[Jira] Error al crear la tarea:', errText);
+            return null;
+        }
+    } catch (e) {
+        console.error('[Jira] Excepción al conectar con la API:', e.message);
+        return null;
+    }
 }
 
 // ================= GENERACIÓN DE PDF Y ENVÍO A ADMIN =================
@@ -254,6 +325,100 @@ app.post('/api/ai/chat', authenticateApiKey, async (req, res) => {
     }
 });
 
+// ================= TÉCNICOS & TICKETS API =================
+app.get('/api/technicians', (req, res) => {
+    db.all(`SELECT * FROM technicians`, [], (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(rows);
+    });
+});
+
+app.post('/api/technicians', authenticateApiKey, (req, res) => {
+    const { name, email } = req.body;
+    if (!name) return res.status(400).json({ error: 'El nombre es obligatorio' });
+    const id = 'tech-' + Math.random().toString(36).substring(2, 7);
+
+    db.run(`INSERT INTO technicians (id, name, email) VALUES (?, ?, ?)`, [id, name, email || ''], (err) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ success: true, message: 'Técnico registrado correctamente.' });
+    });
+});
+
+app.delete('/api/technicians/:id', authenticateApiKey, (req, res) => {
+    db.run(`DELETE FROM technicians WHERE id = ?`, [req.params.id], (err) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ success: true, message: 'Técnico eliminado.' });
+    });
+});
+
+app.get('/api/tickets', (req, res) => {
+    const query = `
+        SELECT t.*, a.name as app_name, b.name as branch_name, tech.name as technician_name 
+        FROM tickets t
+        LEFT JOIN apps a ON t.app_id = a.id
+        LEFT JOIN branches b ON t.branch_id = b.id
+        LEFT JOIN technicians tech ON t.technician_id = tech.id
+        ORDER BY t.created_at DESC
+    `;
+    db.all(query, [], (err, tickets) => {
+        if (err) return res.status(500).json({ error: err.message });
+        
+        db.all(`SELECT * FROM ticket_comments ORDER BY created_at ASC`, [], (err, comments) => {
+            if (err) return res.status(500).json({ error: err.message });
+            
+            const ticketsWithComments = tickets.map(ticket => ({
+                ...ticket,
+                comments: comments.filter(c => c.ticket_id === ticket.id)
+            }));
+            res.json(ticketsWithComments);
+        });
+    });
+});
+
+app.post('/api/tickets', authenticateApiKey, async (req, res) => {
+    const { appId, branchId, fromVersion, toVersion, technicianId } = req.body;
+    if (!appId || !branchId || !fromVersion || !toVersion) {
+        return res.status(400).json({ error: 'Faltan parámetros obligatorios.' });
+    }
+
+    db.get(`SELECT name FROM apps WHERE id = ?`, [appId], async (err, appRow) => {
+        db.get(`SELECT name FROM branches WHERE id = ?`, [branchId], async (err, branchRow) => {
+            const appName = appRow ? appRow.name : appId;
+            const branchName = branchRow ? branchRow.name : branchId;
+
+            const jiraKey = await createJiraIssue({ from_version: fromVersion, to_version: toVersion }, appName, branchName);
+
+            db.run(`INSERT INTO tickets (app_id, branch_id, from_version, to_version, status, technician_id, jira_issue_key) VALUES (?, ?, ?, ?, 'Abierto', ?, ?)`,
+                [appId, branchId, fromVersion, toVersion, technicianId || null, jiraKey || ''], function(err) {
+                    if (err) return res.status(500).json({ error: err.message });
+                    res.json({ success: true, message: 'Ticket creado con éxito y sincronizado con Jira.', ticketId: this.lastID, jiraKey });
+                });
+        });
+    });
+});
+
+app.put('/api/tickets/:id/status', authenticateApiKey, (req, res) => {
+    const { status } = req.body;
+    if (!['Abierto', 'En proceso', 'Cerrado'].includes(status)) {
+        return res.status(400).json({ error: 'Estado inválido.' });
+    }
+    db.run(`UPDATE tickets SET status = ? WHERE id = ?`, [status, req.params.id], (err) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ success: true, message: 'Estado actualizado.' });
+    });
+});
+
+app.post('/api/tickets/:id/comments', authenticateApiKey, (req, res) => {
+    const { technicianName, comment } = req.body;
+    if (!comment) return res.status(400).json({ error: 'El comentario no puede estar vacío.' });
+
+    db.run(`INSERT INTO ticket_comments (ticket_id, technician_name, comment) VALUES (?, ?, ?)`,
+        [req.params.id, technicianName || 'Técnico DevOps', comment], (err) => {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json({ success: true, message: 'Comentario agregado.' });
+        });
+});
+
 // ================= ELIMINAR PROVINCIA POR API (Con cascada) =================
 app.delete('/api/branches/:id', authenticateApiKey, (req, res) => {
     const branchParam = req.params.id;
@@ -302,7 +467,6 @@ app.post('/api/settings', authenticateApiKey, (req, res) => {
 
 app.post('/api/apps/check-updates', async (req, res) => {
     try {
-        // Consultamos las aplicaciones con check_url directamente usando una Promesa para SQLite
         const apps = await new Promise((resolve, reject) => {
             db.all("SELECT * FROM apps WHERE check_url IS NOT NULL AND check_url != ''", [], (err, rows) => {
                 if (err) reject(err);
@@ -319,7 +483,6 @@ app.post('/api/apps/check-updates', async (req, res) => {
                 let newVersion = '';
                 let newChangelog = '';
 
-                // Si la URL es la de PostgreSQL oficial (HTML)
                 if (app.check_url.includes('postgresql.org/docs/release')) {
                     const htmlText = await response.text();
                     const match = htmlText.match(/href="\/docs\/release\/(\d+(?:\.\d+)+)\/"/i) || 
@@ -330,13 +493,11 @@ app.post('/api/apps/check-updates', async (req, res) => {
                         newChangelog = `Obtenido automáticamente desde ${app.check_url}`;
                     }
                 } else {
-                    // Para APIs en formato JSON (GitHub, repos, etc.)
                     const data = await response.json();
                     newVersion = data.tag_name || data.latest || data.version || '';
                     newChangelog = data.body || data.changelog || '';
                 }
 
-                // Actualizamos la base de datos si encontramos una versión válida
                 if (newVersion) {
                     await new Promise((resolve) => {
                         db.run(`UPDATE apps SET latest = ?, changelog = ? WHERE id = ?`, 
@@ -355,8 +516,6 @@ app.post('/api/apps/check-updates', async (req, res) => {
         res.status(500).json({ success: false, error: error.message });
     }
 });
-
-
 
 app.post('/api/deployments/check-updates', authenticateApiKey, async (req, res) => {
     db.all(`SELECT * FROM deployments WHERE version_url IS NOT NULL AND version_url != ''`, [], async (err, deps) => {
@@ -403,7 +562,6 @@ app.post('/api/deployments', authenticateApiKey, (req, res) => {
 });
 
 app.post('/api/branches', async (req, res) => {
-    // Validar permisos de administrador si aplica...
     const { name, contactEmail } = req.body;
     if (!name || !name.trim()) {
         return res.status(400).json({ success: false, error: 'El nombre de la provincia es obligatorio.' });
@@ -411,7 +569,6 @@ app.post('/api/branches', async (req, res) => {
 
     const trimmedName = name.trim();
 
-    // 1. Verificar si ya existe una provincia con el mismo nombre
     db.get("SELECT id FROM branches WHERE LOWER(name) = LOWER(?)", [trimmedName], (err, row) => {
         if (err) {
             return res.status(500).json({ success: false, error: err.message });
@@ -420,7 +577,6 @@ app.post('/api/branches', async (req, res) => {
             return res.status(400).json({ success: false, error: 'Ya existe una provincia registrada con ese nombre.' });
         }
 
-        // 2. Si no existe, proceder con la inserción
         const id = trimmedName.toLowerCase().replace(/[^a-z0-9]/g, '-');
         db.run("INSERT INTO branches (id, name, region) VALUES (?, ?, ?)", [id, trimmedName, contactEmail || ''], (err) => {
             if (err) {
@@ -431,7 +587,6 @@ app.post('/api/branches', async (req, res) => {
     });
 });
 
-// CREAR APLICACIÓN NUEVA
 app.post('/api/apps', async (req, res) => {
     const { name, latest, description, check_url, changelog, migration_tips } = req.body;
     if (!name || !name.trim()) {
@@ -440,14 +595,12 @@ app.post('/api/apps', async (req, res) => {
 
     const trimmedName = name.trim();
 
-    // 1. Verificar si ya existe una app con ese nombre
     db.get("SELECT id FROM apps WHERE LOWER(name) = LOWER(?)", [trimmedName], (err, row) => {
         if (err) return res.status(500).json({ success: false, error: err.message });
         if (row) {
             return res.status(400).json({ success: false, error: 'Ya existe una aplicación registrada con ese nombre.' });
         }
 
-        // 2. Insertar
         const id = 'app-' + trimmedName.toLowerCase().replace(/[^a-z0-9]/g, '-');
         db.run(`INSERT INTO apps (id, name, latest, description, check_url, changelog, migration_tips) VALUES (?, ?, ?, ?, ?, ?, ?)`,
             [id, trimmedName, latest || 'v1.0.0', description || '', check_url || '', changelog || '', migration_tips || ''], (err) => {
@@ -457,7 +610,6 @@ app.post('/api/apps', async (req, res) => {
     });
 });
 
-// ACTUALIZAR APLICACIÓN EXISTENTE
 app.put('/api/apps/:id', async (req, res) => {
     const appId = req.params.id;
     const { name, latest, description, check_url, changelog, migration_tips } = req.body;
@@ -467,17 +619,15 @@ app.put('/api/apps/:id', async (req, res) => {
 
     const trimmedName = name.trim();
 
-    // 1. Verificar si otra aplicación diferente ya tiene ese nombre
     db.get("SELECT id FROM apps WHERE LOWER(name) = LOWER(?) AND id != ?", [trimmedName, appId], (err, row) => {
         if (err) return res.status(500).json({ success: false, error: err.message });
         if (row) {
             return res.status(400).json({ success: false, error: 'Ya existe otra aplicación con ese nombre.' });
         }
 
-        // 2. Actualizar
         db.run(`UPDATE apps SET name = ?, latest = ?, description = ?, check_url = ?, changelog = ?, migration_tips = ? WHERE id = ?`,
             [trimmedName, latest, description, check_url, changelog, migration_tips, appId], (err) => {
-                if (err) return res.status(500).json({ success: false, error: err.message });
+                if (err) return res.status(500).json({ error: err.message });
                 res.json({ success: true, message: 'Aplicación actualizada correctamente.' });
             });
     });

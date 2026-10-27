@@ -19,7 +19,11 @@ services:
       - SMTP_PORT
       - VIEWER_KEY
       - GEMINI_API_KEY
-
+      - JIRA_URL
+      - JIRA_USER
+      - JIRA_API_TOKEN
+      - JIRA_PROJECT_KEY
+      
   nginx-provincia-test:
     image: nginx:alpine
     ports:
