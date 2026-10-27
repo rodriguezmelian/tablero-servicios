@@ -160,8 +160,16 @@
                         <h2 class="text-base font-semibold text-white">Matriz de Versiones por Provincia</h2>
                         <p class="text-xs text-slate-400">Verde: Al día | Amarillo: Adelantada/Beta | Gris: No Aplica (N/A) | Rojo: Desactualizada.</p>
                     </div>
-                    <!-- Filtros Combinados (Provincia y Tecnología) -->
+                    <!-- Filtros y Ordenamiento (Categoría, Provincia y Tecnología) -->
                     <div class="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                        <!-- Selector de Categoría / Orden -->
+                        <div class="w-full sm:w-48">
+                            <select x-model="selectedCategorySort" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500">
+                                <option value="all">Todas las categorías</option>
+                                <option value="System">Solo System</option>
+                                <option value="Deployments">Solo Deployments</option>
+                            </select>
+                        </div>
                         <!-- Selector de Provincia -->
                         <div class="w-full sm:w-48">
                             <select x-model="selectedProvinceFilter" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500">
@@ -202,7 +210,12 @@
                                                     <i data-lucide="box" class="w-4 h-4"></i>
                                                 </div>
                                                 <div>
-                                                    <div x-text="app.name" class="font-semibold text-white"></div>
+                                                    <div class="flex items-center space-x-2">
+                                                        <span x-text="app.name" class="font-semibold text-white"></span>
+                                                        <span class="px-2 py-0.5 rounded text-[10px] font-medium border"
+                                                              :class="app.category === 'System' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' : 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'"
+                                                              x-text="app.category || 'Deployments'"></span>
+                                                    </div>
                                                     <div class="text-xs text-slate-400" x-text="app.description"></div>
                                                 </div>
                                             </div>
@@ -218,10 +231,10 @@
                                                 <div class="inline-flex flex-col items-center">
                                                     <span class="px-2.5 py-1 rounded-md text-xs font-medium border"
                                                           :class="{
-                                                              'bg-emerald-500/15 text-emerald-400 border-emerald-500/30': getVersionStatus(app.latest, getVersion(app.id, branch.id)) === 'ok',
-                                                              'bg-amber-500/15 text-amber-400 border-amber-500/30': getVersionStatus(app.latest, getVersion(app.id, branch.id)) === 'ahead',
-                                                              'bg-slate-700/40 text-slate-400 border-slate-600': getVersionStatus(app.latest, getVersion(app.id, branch.id)) === 'na',
-                                                              'bg-rose-500/15 text-rose-400 border-rose-500/30': getVersionStatus(app.latest, getVersion(app.id, branch.id)) === 'outdated'
+                                                            'bg-emerald-500/15 text-emerald-400 border-emerald-500/30': getVersionStatus(app.latest, getVersion(app.id, branch.id)) === 'ok',
+                                                            'bg-amber-500/15 text-amber-400 border-amber-500/30': getVersionStatus(app.latest, getVersion(app.id, branch.id)) === 'ahead',
+                                                            'bg-slate-700/40 text-slate-400 border-slate-600': getVersionStatus(app.latest, getVersion(app.id, branch.id)) === 'na',
+                                                            'bg-rose-500/15 text-rose-400 border-rose-500/30': getVersionStatus(app.latest, getVersion(app.id, branch.id)) === 'outdated'
                                                           }"
                                                           x-text="getVersion(app.id, branch.id)"></span>
                                                     <!-- Botón Editar (Solo Administrador) -->
@@ -478,6 +491,7 @@
                                         <div class="font-semibold text-white text-sm flex items-center space-x-2">
                                             <span x-text="app.name"></span>
                                             <span class="px-2 py-0.5 rounded text-[10px] bg-purple-500/10 text-purple-400 border border-purple-500/20" x-text="app.latest"></span>
+                                            <span class="px-2 py-0.5 rounded text-[10px]" :class="app.category === 'System' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'" x-text="app.category || 'Deployments'"></span>
                                         </div>
                                         <div class="text-xs text-slate-400" x-text="app.description"></div>
                                         <div class="text-[10px] text-indigo-300 font-mono mt-0.5" x-text="app.check_url ? 'URL: ' + app.check_url : 'Sin URL de auto-check'"></div>
@@ -653,6 +667,13 @@
                     <input type="text" x-model="appForm.name" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500">
                 </div>
                 <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Categoría</label>
+                    <select x-model="appForm.category" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500">
+                        <option value="Deployments">Deployments</option>
+                        <option value="System">System</option>
+                    </select>
+                </div>
+                <div>
                     <label class="block text-xs font-medium text-slate-300 mb-1">Última Versión Oficial</label>
                     <input type="text" x-model="appForm.latest" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500">
                 </div>
@@ -823,6 +844,7 @@
                 currentTab: 'matrix',
                 searchQuery: '',
                 selectedProvinceFilter: '',
+                selectedCategorySort: 'all', // Filtro y orden por Categoría
                 selectedMigrateBranch: '',
                 selectedMigrateApp: '',
                 chatInput: '',
@@ -833,7 +855,7 @@
                 deploymentUrls: {},
                 tickets: [],
                 technicians: [],
-                showClosedTickets: false, // Variable para alternar la vista de tickets cerrados
+                showClosedTickets: false,
                 adminEmailInput: '',
                 logs: [],
                 showDeployModal: false,
@@ -845,7 +867,7 @@
                 branchForm: { name: '', contactEmail: '' },
                 showAppModal: false,
                 isEditingApp: false,
-                appForm: { id: '', name: '', latest: 'v1.0.0', description: '', check_url: '', changelog: '', migration_tips: '' },
+                appForm: { id: '', name: '', latest: 'v1.0.0', description: '', check_url: '', changelog: '', migration_tips: '', category: 'Deployments' },
                 showTicketModal: false,
                 showTechModal: false,
                 showDetailsModal: false,
@@ -856,9 +878,28 @@
                 newCommentText: '',
 
                 get filteredApps() {
-                    if (!this.searchQuery) return this.apps;
-                    const q = this.searchQuery.toLowerCase();
-                    return this.apps.filter(app => app.name.toLowerCase().includes(q) || (app.description && app.description.toLowerCase().includes(q)));
+                    let result = this.apps;
+                    
+                    // Filtrar por categoría
+                    if (this.selectedCategorySort !== 'all') {
+                        result = result.filter(app => (app.category || 'Deployments') === this.selectedCategorySort);
+                    }
+
+                    // Filtrar por buscador de texto
+                    if (this.searchQuery) {
+                        const q = this.searchQuery.toLowerCase();
+                        result = result.filter(app => app.name.toLowerCase().includes(q) || (app.description && app.description.toLowerCase().includes(q)));
+                    }
+
+                    // Ordenar agrupando por categoría (System primero o Deployments primero) y luego por nombre alfabéticamente
+                    return result.sort((a, b) => {
+                        const catA = a.category || 'Deployments';
+                        const catB = b.category || 'Deployments';
+                        if (catA !== catB) {
+                            return catA.localeCompare(catB);
+                        }
+                        return a.name.localeCompare(b.name);
+                    });
                 },
 
                 get filteredBranches() {
@@ -981,6 +1022,13 @@
                         alert('Selecciona aplicación y provincia.');
                         return;
                     }
+
+                    // Validación en el cliente: Versión origen y objetivo no pueden ser iguales
+                    if (this.ticketForm.fromVersion.trim() === this.ticketForm.toVersion.trim()) {
+                        alert('La versión origen y la versión objetivo no pueden ser iguales.');
+                        return;
+                    }
+
                     const res = await fetch('/api/tickets', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json', 'x-api-key': this.apiKey },
@@ -1003,6 +1051,7 @@
                         body: JSON.stringify({ status: newStatus })
                     });
                     await this.fetchTicketsAndTechs();
+                    await this.fetchState(); // Actualiza la matriz por si se actualizó automáticamente al cerrar
                 },
 
                 openTechModal() {
@@ -1318,14 +1367,14 @@
                 openAppModal() {
                     if (this.userRole !== 'admin') return;
                     this.isEditingApp = false;
-                    this.appForm = { id: '', name: '', latest: 'v1.0.0', description: '', check_url: '', changelog: '', migration_tips: '' };
+                    this.appForm = { id: '', name: '', latest: 'v1.0.0', description: '', check_url: '', changelog: '', migration_tips: '', category: 'Deployments' };
                     this.showAppModal = true;
                 },
 
                 openEditAppModal(app) {
                     if (this.userRole !== 'admin') return;
                     this.isEditingApp = true;
-                    this.appForm = { id: app.id, name: app.name, latest: app.latest, description: app.description || '', check_url: app.check_url || '', changelog: app.changelog || '', migration_tips: app.migration_tips || '' };
+                    this.appForm = { id: app.id, name: app.name, latest: app.latest, description: app.description || '', check_url: app.check_url || '', changelog: app.changelog || '', migration_tips: app.migration_tips || '', category: app.category || 'Deployments' };
                     this.showAppModal = true;
                 },
 

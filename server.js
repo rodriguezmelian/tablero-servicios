@@ -57,8 +57,10 @@ function initDb() {
             description TEXT,
             check_url TEXT,
             changelog TEXT,
-            migration_tips TEXT
+            migration_tips TEXT,
+            category TEXT DEFAULT 'Deployments'
         )`, () => {
+            db.run(`ALTER TABLE apps ADD COLUMN category TEXT DEFAULT 'Deployments'`, (err) => {});
             db.run(`ALTER TABLE apps ADD COLUMN changelog TEXT`, (err) => {});
             db.run(`ALTER TABLE apps ADD COLUMN migration_tips TEXT`, (err) => {});
         });
@@ -116,18 +118,18 @@ function initDb() {
                 const defaultBranches = [
                     { id: 'salta', name: 'Salta', region: 'contacto@salta.gob.ar' },
                     { id: 'tucuman', name: 'Tucumán', region: 'contacto@tucuman.gov.ar' },
-                    { id: 'mendoza', name: 'Mendoza', region: 'contacto@mendoza.gov.ar' }
+                    { id: 'mendoza', name: 'Mendoza', region: 'contacto@mendoza.gob.ar' }
                 ];
                 defaultBranches.forEach(b => {
                     db.run(`INSERT INTO branches (id, name, region) VALUES (?, ?, ?)`, [b.id, b.name, b.region]);
                 });
 
                 const defaultApps = [
-                    { id: 'app-rancher', name: 'Rancher', latest: 'v1.0.0', description: 'Version 2025', check_url: '', changelog: 'Versión inicial estable con soporte multinodo.', migration_tips: 'Verificar compatibilidad de certificados SSL.' },
-                    { id: 'app-postgres', name: 'Postgres', latest: 'v3.0', description: 'Base de datos', check_url: '', changelog: 'Optimización de índices y mejoras de rendimiento.', migration_tips: 'Realizar backup completo antes de aplicar el upgrade.' }
+                    { id: 'app-rancher', name: 'Rancher', latest: 'v1.0.0', description: 'Version 2025', check_url: '', changelog: 'Versión inicial estable con soporte multinodo.', migration_tips: 'Verificar compatibilidad de certificados SSL.', category: 'Deployments' },
+                    { id: 'app-postgres', name: 'Postgres', latest: 'v3.0', description: 'Base de datos', check_url: '', changelog: 'Optimización de índices y mejoras de rendimiento.', migration_tips: 'Realizar backup completo antes de aplicar el upgrade.', category: 'System' }
                 ];
                 defaultApps.forEach(a => {
-                    db.run(`INSERT INTO apps (id, name, latest, description, check_url, changelog, migration_tips) VALUES (?, ?, ?, ?, ?, ?, ?)`, [a.id, a.name, a.latest, a.description, a.check_url, a.changelog, a.migration_tips]);
+                    db.run(`INSERT INTO apps (id, name, latest, description, check_url, changelog, migration_tips, category) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, [a.id, a.name, a.latest, a.description, a.check_url, a.changelog, a.migration_tips, a.category]);
                 });
             }
         });
@@ -214,7 +216,7 @@ function generatePDFReport(stateData) {
         doc.moveDown(0.5);
 
         stateData.apps.forEach(app => {
-            doc.fontSize(11).fillColor('#4f46e5').text(`• Aplicación: ${app.name} (Última oficial: ${app.latest})`);
+            doc.fontSize(11).fillColor('#4f46e5').text(`• Aplicación: ${app.name} [${app.category || 'Deployments'}] (Última oficial: ${app.latest})`);
             stateData.branches.forEach(branch => {
                 const key = app.id + '_' + branch.id;
                 const ver = stateData.deployments[key] || 'v1.0.0';
@@ -379,6 +381,11 @@ app.post('/api/tickets', authenticateApiKey, async (req, res) => {
     const { appId, branchId, fromVersion, toVersion, technicianId } = req.body;
     if (!appId || !branchId || !fromVersion || !toVersion) {
         return res.status(400).json({ error: 'Faltan parámetros obligatorios.' });
+    }
+
+    // Validación: Versión origen y objetivo no pueden ser iguales
+    if (fromVersion.trim() === toVersion.trim()) {
+        return res.status(400).json({ error: 'La versión origen y la versión objetivo no pueden ser iguales.' });
     }
 
     db.get(`SELECT name FROM apps WHERE id = ?`, [appId], async (err, appRow) => {
@@ -623,12 +630,13 @@ app.post('/api/branches', async (req, res) => {
 });
 
 app.post('/api/apps', async (req, res) => {
-    const { name, latest, description, check_url, changelog, migration_tips } = req.body;
+    const { name, latest, description, check_url, changelog, migration_tips, category } = req.body;
     if (!name || !name.trim()) {
         return res.status(400).json({ success: false, error: 'El nombre de la aplicación es obligatorio.' });
     }
 
     const trimmedName = name.trim();
+    const appCategory = category && ['System', 'Deployments'].includes(category) ? category : 'Deployments';
 
     db.get("SELECT id FROM apps WHERE LOWER(name) = LOWER(?)", [trimmedName], (err, row) => {
         if (err) return res.status(500).json({ success: false, error: err.message });
@@ -637,8 +645,8 @@ app.post('/api/apps', async (req, res) => {
         }
 
         const id = 'app-' + trimmedName.toLowerCase().replace(/[^a-z0-9]/g, '-');
-        db.run(`INSERT INTO apps (id, name, latest, description, check_url, changelog, migration_tips) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-            [id, trimmedName, latest || 'v1.0.0', description || '', check_url || '', changelog || '', migration_tips || ''], (err) => {
+        db.run(`INSERT INTO apps (id, name, latest, description, check_url, changelog, migration_tips, category) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [id, trimmedName, latest || 'v1.0.0', description || '', check_url || '', changelog || '', migration_tips || '', appCategory], (err) => {
                 if (err) return res.status(500).json({ success: false, error: err.message });
                 res.json({ success: true, message: 'Aplicación creada correctamente.' });
             });
@@ -647,12 +655,13 @@ app.post('/api/apps', async (req, res) => {
 
 app.put('/api/apps/:id', async (req, res) => {
     const appId = req.params.id;
-    const { name, latest, description, check_url, changelog, migration_tips } = req.body;
+    const { name, latest, description, check_url, changelog, migration_tips, category } = req.body;
     if (!name || !name.trim()) {
         return res.status(400).json({ success: false, error: 'El nombre de la aplicación es obligatorio.' });
     }
 
     const trimmedName = name.trim();
+    const appCategory = category && ['System', 'Deployments'].includes(category) ? category : 'Deployments';
 
     db.get("SELECT id FROM apps WHERE LOWER(name) = LOWER(?) AND id != ?", [trimmedName, appId], (err, row) => {
         if (err) return res.status(500).json({ success: false, error: err.message });
@@ -660,8 +669,8 @@ app.put('/api/apps/:id', async (req, res) => {
             return res.status(400).json({ success: false, error: 'Ya existe otra aplicación con ese nombre.' });
         }
 
-        db.run(`UPDATE apps SET name = ?, latest = ?, description = ?, check_url = ?, changelog = ?, migration_tips = ? WHERE id = ?`,
-            [trimmedName, latest, description, check_url, changelog, migration_tips, appId], (err) => {
+        db.run(`UPDATE apps SET name = ?, latest = ?, description = ?, check_url = ?, changelog = ?, migration_tips = ?, category = ? WHERE id = ?`,
+            [trimmedName, latest, description, check_url, changelog, migration_tips, appCategory, appId], (err) => {
                 if (err) return res.status(500).json({ error: err.message });
                 res.json({ success: true, message: 'Aplicación actualizada correctamente.' });
             });
