@@ -59,7 +59,7 @@
                     </div>
                     <div>
                         <h1 class="text-lg font-bold text-white tracking-tight">Version Hub</h1>
-                        <p class="text-xs text-slate-400">Control de Despliegues por Provincia (SQLite)</p>
+                        <p class="text-xs text-slate-400" x-text="'Control de Despliegues por ' + branchLabel + ' (SQLite)'"></p>
                     </div>
                 </div>
                 <div class="flex items-center space-x-3">
@@ -68,7 +68,7 @@
                         <div class="flex items-center space-x-3">
                             <button @click="checkProvinceUpdates()" class="flex items-center space-x-2 bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-all shadow-md">
                                 <i data-lucide="cloud-download" class="w-3.5 h-3.5"></i>
-                                <span>Sync Provincias JSON</span>
+                                <span x-text="'Sync ' + branchLabel + ' JSON'"></span>
                             </button>
                             <button @click="checkOnlineUpdates()" class="flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-all shadow-md shadow-indigo-600/20">
                                 <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
@@ -90,7 +90,7 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div class="bg-slate-800/80 backdrop-blur border border-slate-700/80 p-5 rounded-2xl shadow-sm">
                     <div class="flex items-center justify-between">
-                        <span class="text-sm font-medium text-slate-400">Provincias Activas</span>
+                        <span class="text-sm font-medium text-slate-400" x-text="branchLabel + ' Activas'"></span>
                         <div class="p-2 bg-blue-500/10 text-blue-400 rounded-lg"><i data-lucide="map-pin" class="w-5 h-5"></i></div>
                     </div>
                     <div class="mt-4 flex items-baseline justify-between">
@@ -141,7 +141,7 @@
                 </button>
                 <button x-show="userRole === 'admin'" @click="currentTab = 'crud'" :class="currentTab === 'crud' ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-slate-400 hover:text-slate-200'" class="pb-3 border-b-2 font-medium text-sm transition-colors flex items-center space-x-2 whitespace-nowrap">
                     <i data-lucide="sliders" class="w-4 h-4"></i>
-                    <span>Gestión (Apps & Provincias)</span>
+                    <span x-text="'Gestión (Apps & ' + branchLabel + ')'"></span>
                 </button>
                 <button @click="currentTab = 'docs'" :class="currentTab === 'docs' ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-slate-400 hover:text-slate-200'" class="pb-3 border-b-2 font-medium text-sm transition-colors flex items-center space-x-2 whitespace-nowrap">
                     <i data-lucide="book-open" class="w-4 h-4"></i>
@@ -157,7 +157,7 @@
             <div x-show="currentTab === 'matrix'" class="space-y-6" x-cloak>
                 <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-800/50 p-4 rounded-xl border border-slate-700/60">
                     <div>
-                        <h2 class="text-base font-semibold text-white">Matriz de Versiones por Provincia</h2>
+                        <h2 class="text-base font-semibold text-white" x-text="'Matriz de Versiones por ' + branchLabel"></h2>
                         <p class="text-xs text-slate-400">Verde: Al día | Amarillo: Adelantada/Beta | Gris: No Aplica (N/A) | Rojo: Desactualizada.</p>
                     </div>
                     <!-- Filtros y Ordenamiento (Categoría, Provincia y Tecnología) -->
@@ -173,7 +173,7 @@
                         <!-- Selector de Provincia -->
                         <div class="w-full sm:w-48">
                             <select x-model="selectedProvinceFilter" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500">
-                                <option value="">Todas las provincias</option>
+                                <option value="" x-text="'Todas las ' + branchLabel.toLowerCase()"></option>
                                 <template x-for="branch in branches" :key="branch.id">
                                     <option :value="branch.id" x-text="branch.name"></option>
                                 </template>
@@ -213,8 +213,8 @@
                                                     <div class="flex items-center space-x-2">
                                                         <span x-text="app.name" class="font-semibold text-white"></span>
                                                         <span class="px-2 py-0.5 rounded text-[10px] font-medium border"
-                                                              :class="app.category === 'System' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' : 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'"
-                                                              x-text="app.category || 'Deployments'"></span>
+                                                            :class="app.category === 'System' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' : 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'"
+                                                            x-text="app.category || 'Deployments'"></span>
                                                     </div>
                                                     <div class="text-xs text-slate-400" x-text="app.description"></div>
                                                 </div>
@@ -230,13 +230,13 @@
                                             <td class="py-4 px-6 text-center">
                                                 <div class="inline-flex flex-col items-center">
                                                     <span class="px-2.5 py-1 rounded-md text-xs font-medium border"
-                                                          :class="{
+                                                        :class="{
                                                             'bg-emerald-500/15 text-emerald-400 border-emerald-500/30': getVersionStatus(app.latest, getVersion(app.id, branch.id)) === 'ok',
                                                             'bg-amber-500/15 text-amber-400 border-amber-500/30': getVersionStatus(app.latest, getVersion(app.id, branch.id)) === 'ahead',
                                                             'bg-slate-700/40 text-slate-400 border-slate-600': getVersionStatus(app.latest, getVersion(app.id, branch.id)) === 'na',
                                                             'bg-rose-500/15 text-rose-400 border-rose-500/30': getVersionStatus(app.latest, getVersion(app.id, branch.id)) === 'outdated'
-                                                          }"
-                                                          x-text="getVersion(app.id, branch.id)"></span>
+                                                        }"
+                                                        x-text="getVersion(app.id, branch.id)"></span>
                                                     <!-- Botón Editar (Solo Administrador) -->
                                                     <button x-show="userRole === 'admin'" @click="openEditDeployment(app, branch)" class="mt-1 text-[10px] text-indigo-400 hover:underline">Editar</button>
                                                 </div>
@@ -263,9 +263,9 @@
                             </h3>
                             
                             <div>
-                                <label class="block text-xs font-medium text-slate-300 mb-1">Seleccionar Provincia</label>
+                                <label class="block text-xs font-medium text-slate-300 mb-1" x-text="'Seleccionar ' + branchLabel"></label>
                                 <select x-model="selectedMigrateBranch" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500">
-                                    <option value="">-- Elige provincia --</option>
+                                    <option value="" x-text="'-- Elige ' + branchLabel.toLowerCase() + ' --'"></option>
                                     <template x-for="branch in branches" :key="branch.id">
                                         <option :value="branch.id" x-text="branch.name"></option>
                                     </template>
@@ -346,7 +346,7 @@
                             <div class="bg-slate-900/90 border border-slate-700/80 rounded-xl p-4 h-56 overflow-y-auto space-y-3 text-xs">
                                 <div class="flex space-x-2">
                                     <span class="font-bold text-indigo-400">IA:</span>
-                                    <p class="text-slate-300">¡Hola! Selecciona una provincia y aplicación arriba para que realice el análisis automático del salto de versión.</p>
+                                    <p class="text-slate-300" x-text="'¡Hola! Selecciona una ' + branchLabel.toLowerCase() + ' y aplicación arriba para que realice el análisis automático del salto de versión.'"></p>
                                 </div>
                                 <template x-for="msg in chatMessages" :key="msg.text">
                                     <div class="flex space-x-2" :class="msg.sender === 'user' ? 'justify-end' : ''">
@@ -400,7 +400,7 @@
                             <thead>
                                 <tr class="bg-slate-900/60 border-b border-slate-700 text-xs font-semibold text-slate-400 uppercase tracking-wider">
                                     <th class="py-3 px-4">ID / Jira</th>
-                                    <th class="py-3 px-4">Provincia</th>
+                                    <th class="py-3 px-4" x-text="branchLabel"></th>
                                     <th class="py-3 px-4">Aplicación</th>
                                     <th class="py-3 px-4">Salto Versión</th>
                                     <th class="py-3 px-4">Estado</th>
@@ -452,10 +452,9 @@
                         <div class="flex items-center justify-between pb-4 border-b border-slate-700">
                             <h2 class="text-base font-semibold text-white flex items-center space-x-2">
                                 <i data-lucide="map-pin" class="w-5 h-5 text-indigo-400"></i>
-                                <span>Administrar Provincias</span>
+                                <span x-text="'Administrar ' + branchLabel"></span>
                             </h2>
-                            <button @click="openBranchModal()" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-all">
-                                + Nueva Provincia
+                            <button @click="openBranchModal()" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-all" x-text="'+ Nueva ' + branchLabel">
                             </button>
                         </div>
                         <div class="mt-4 divide-y divide-slate-700">
@@ -595,6 +594,20 @@
 
             <!-- TAB 4: SETTINGS & REPORTS (Solo Admin) -->
             <div x-show="currentTab === 'settings' && userRole === 'admin'" class="space-y-6" x-cloak>
+                
+                <!-- BLOQUE DE PERSONALIZACIÓN DE NOMENCLATURA -->
+                <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-sm space-y-4">
+                    <h3 class="text-base font-bold text-white flex items-center space-x-2">
+                        <i data-lucide="tag" class="w-5 h-5 text-indigo-400"></i>
+                        <span>Personalización de Nomenclatura</span>
+                    </h3>
+                    <p class="text-xs text-slate-300">Define cómo se denominarán las agrupaciones territoriales o de infraestructura en el tablero (ej. Ambientes, Sucursales, Entidades):</p>
+                    <div class="flex flex-col sm:flex-row gap-3 max-w-xl">
+                        <input type="text" x-model="branchLabelInput" placeholder="Ej. Sucursales" class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500">
+                        <button @click="saveBranchLabel()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2.5 rounded-lg text-sm font-medium transition-all shadow-md">Guardar Término</button>
+                    </div>
+                </div>
+
                 <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-sm space-y-4">
                     <h3 class="text-base font-bold text-white flex items-center space-x-2">
                         <i data-lucide="mail" class="w-5 h-5 text-indigo-400"></i>
@@ -635,7 +648,7 @@
     <!-- MODAL: EDIT DEPLOYMENT VERSION -->
     <div x-show="showDeployModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm" x-cloak>
         <div class="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-md p-6 shadow-2xl">
-            <h3 class="text-lg font-bold text-white mb-2">Actualizar Versión en Provincia</h3>
+            <h3 class="text-lg font-bold text-white mb-2" x-text="'Actualizar Versión en ' + branchLabel"></h3>
             <p class="text-xs text-slate-400 mb-4" x-text="selectedApp.name + ' en ' + selectedBranch.name"></p>
             <div class="space-y-4">
                 <div>
@@ -643,7 +656,7 @@
                     <input type="text" x-model="modalVersion" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500">
                 </div>
                 <div>
-                    <label class="block text-xs font-medium text-slate-300 mb-1">URL JSON de la Provincia (Auto-Sync)</label>
+                    <label class="block text-xs font-medium text-slate-300 mb-1" x-text="'URL JSON de ' + branchLabel + ' (Auto-Sync)'"></label>
                     <input type="url" x-model="modalVersionUrl" placeholder="http://nginx-provincia-test/version.json" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500">
                 </div>
                 <div class="flex items-center space-x-2 pt-1">
@@ -704,10 +717,10 @@
     <!-- MODAL: ADD BRANCH -->
     <div x-show="showBranchModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm" x-cloak>
         <div class="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-md p-6 shadow-2xl">
-            <h3 class="text-lg font-bold text-white mb-2">Nueva Provincia</h3>
+            <h3 class="text-lg font-bold text-white mb-2" x-text="'Nueva ' + branchLabel"></h3>
             <div class="space-y-4">
                 <div>
-                    <label class="block text-xs font-medium text-slate-300 mb-1">Nombre (ej. Córdoba)</label>
+                    <label class="block text-xs font-medium text-slate-300 mb-1" x-text="'Nombre (ej. Córdoba)'"></label>
                     <input type="text" x-model="branchForm.name" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500">
                 </div>
                 <div>
@@ -727,9 +740,9 @@
         <div class="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-4">
             <h3 class="text-lg font-bold text-white">Crear Ticket DevOps</h3>
             <div>
-                <label class="block text-xs font-medium text-slate-300 mb-1">Provincia</label>
+                <label class="block text-xs font-medium text-slate-300 mb-1" x-text="branchLabel"></label>
                 <select x-model="ticketForm.branchId" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white">
-                    <option value="">-- Seleccionar provincia --</option>
+                    <option value="" x-text="'-- Seleccionar ' + branchLabel.toLowerCase() + ' --'"></option>
                     <template x-for="branch in branches" :key="branch.id">
                         <option :value="branch.id" x-text="branch.name"></option>
                     </template>
@@ -857,6 +870,8 @@
                 technicians: [],
                 showClosedTickets: false,
                 adminEmailInput: '',
+                branchLabel: 'Provincias', // Etiqueta dinámica por defecto
+                branchLabelInput: '',
                 logs: [],
                 showDeployModal: false,
                 selectedApp: {},
@@ -980,12 +995,37 @@
                         this.apps = data.apps;
                         this.deployments = data.deployments;
                         this.deploymentUrls = data.deploymentUrls || {};
+                        
+                        // Carga el valor desde la base de datos si existe
+                        if (data.settings && data.settings.branch_label) {
+                            this.branchLabel = data.settings.branch_label;
+                            this.branchLabelInput = data.settings.branch_label;
+                        }
+
                         if (data.settings && data.settings.admin_email) {
                             this.adminEmailInput = data.settings.admin_email;
                         }
                         this.addLog('Estado sincronizado desde SQLite.');
                     } catch (e) {
                         this.addLog('Error al conectar con la API.');
+                    }
+                },
+
+                // Función requerida para guardar la nomenclatura
+                async saveBranchLabel() {
+                    if (this.userRole !== 'admin') return;
+                    try {
+                        const res = await fetch('/api/settings', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'x-api-key': this.apiKey },
+                            body: JSON.stringify({ branch_label: this.branchLabelInput })
+                        });
+                        const data = await res.json();
+                        this.branchLabel = this.branchLabelInput;
+                        alert(data.message || 'Nomenclatura actualizada correctamente.');
+                        this.addLog('Nomenclatura actualizada.');
+                    } catch (e) {
+                        alert('Error al guardar la etiqueta.');
                     }
                 },
 
@@ -1019,7 +1059,7 @@
 
                 async saveTicket() {
                     if (!this.ticketForm.appId || !this.ticketForm.branchId) {
-                        alert('Selecciona aplicación y provincia.');
+                        alert('Selecciona aplicación y ' + this.branchLabel.toLowerCase() + '.');
                         return;
                     }
 
@@ -1138,7 +1178,7 @@
                 async checkProvinceUpdates() {
                     if (this.userRole !== 'admin') return;
                     try {
-                        this.addLog('Sincronizando versiones desde endpoints JSON de provincias...');
+                        this.addLog('Sincronizando versiones desde endpoints JSON de ' + this.branchLabel.toLowerCase() + '...');
                         const res = await fetch('/api/deployments/check-updates', {
                             method: 'POST',
                             headers: { 'x-api-key': this.apiKey }
@@ -1148,10 +1188,10 @@
                             this.addLog(data.message);
                             await this.fetchState();
                         } else {
-                            this.addLog('Error al sincronizar con provincias.');
+                            this.addLog('Error al sincronizar con ' + this.branchLabel.toLowerCase() + '.');
                         }
                     } catch (e) {
-                        this.addLog('Error de red al sincronizar provincias.');
+                        this.addLog('Error de red al sincronizar ' + this.branchLabel.toLowerCase() + '.');
                     }
                 },
 
@@ -1198,7 +1238,7 @@
                     const currentVer = this.getVersion(app.id, branch.id);
                     const targetVer = app.latest;
 
-                    const promptText = `Actúa como un experto DevOps. Analiza automáticamente el salto de versión para la aplicación "${app.name}" desplegada en la provincia "${branch.name}". Versión actual: ${currentVer}, Versión objetivo (última): ${targetVer}. Changelog oficial: "${app.changelog || 'No especificado'}". Tips de migración y precauciones: "${app.migration_tips || 'Ninguno'}". Por favor, dame los pasos detallados a seguir para realizar esta migración de forma segura, incluyendo validaciones previas y un plan de rollback.`;
+                    const promptText = `Actúa como un experto DevOps. Analiza automáticamente el salto de versión para la aplicación "${app.name}" desplegada en la ${this.branchLabel.toLowerCase()} "${branch.name}". Versión actual: ${currentVer}, Versión objetivo (última): ${targetVer}. Changelog oficial: "${app.changelog || 'No especificado'}". Tips de migración y precauciones: "${app.migration_tips || 'Ninguno'}". Por favor, dame los pasos detallados a seguir para realizar esta migración de forma segura, incluyendo validaciones previas y un plan de rollback.`;
 
                     this.chatMessages.push({ 
                         sender: 'user', 

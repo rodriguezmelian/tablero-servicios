@@ -84,6 +84,12 @@ function initDb() {
                     db.run(`INSERT INTO settings (key, value) VALUES ('admin_email', 'admin@versionhub.local')`);
                 }
             });
+            // Configuración por defecto para la variabilización de la nomenclatura de provincias/sucursales/ambientes
+            db.get(`SELECT value FROM settings WHERE key = 'branch_label'`, (err, row) => {
+                if (!row) {
+                    db.run(`INSERT INTO settings (key, value) VALUES ('branch_label', 'Provincias')`);
+                }
+            });
         });
 
         // Nuevas tablas para la gestión de Tickets y Técnicos (DevOps)
@@ -172,7 +178,7 @@ async function createJiraIssue(ticketData, appName, branchName) {
                 fields: {
                     project: { key: projectKey },
                     summary: `[Version Hub] Migración ${appName} en ${branchName} (${ticketData.from_version} ➔ ${ticketData.to_version})`,
-                    description: `Ticket generado automáticamente desde Version Hub.\n\nAplicación: ${appName}\nProvincia: ${branchName}\nVersión origen: ${ticketData.from_version}\nVersión objetivo: ${ticketData.to_version}`,
+                    description: `Ticket generado automáticamente desde Version Hub.\n\nAplicación: ${appName}\nEntidad/Sucursal: ${branchName}\nVersión origen: ${ticketData.from_version}\nVersión objetivo: ${ticketData.to_version}`,
                     issuetype: { name: 'Task' }
                 }
             })
@@ -208,7 +214,7 @@ function generatePDFReport(stateData) {
         doc.moveDown(2);
 
         doc.fontSize(14).fillColor('#1e293b').text('Resumen General');
-        doc.fontSize(10).fillColor('#334155').text(`Total Provincias Activas: ${stateData.branches.length}`);
+        doc.fontSize(10).fillColor('#334155').text(`Total Registros Activos: ${stateData.branches.length}`);
         doc.text(`Total Aplicaciones Monitoreadas: ${stateData.apps.length}`);
         doc.moveDown(1.5);
 
@@ -404,7 +410,7 @@ app.post('/api/tickets', authenticateApiKey, async (req, res) => {
     });
 });
 
-// Validación contra la URL de Auto-Sync (version_url) de la aplicación en la provincia específica
+// Validación contra la URL de Auto-Sync (version_url) de la aplicación en la entidad específica
 app.put('/api/tickets/:id/status', authenticateApiKey, (req, res) => {
     const { status } = req.body;
     if (!['Abierto', 'En proceso', 'Cerrado'].includes(status)) {
@@ -423,7 +429,7 @@ app.put('/api/tickets/:id/status', authenticateApiKey, (req, res) => {
                 return res.status(500).json({ error: err.message });
             }
 
-            // Si el ticket pasa a "Cerrado", validamos si la provincia tiene configurada su propia version_url
+            // Si el ticket pasa a "Cerrado", validamos si la entidad tiene configurada su propia version_url
             if (status === 'Cerrado') {
                 db.get(`SELECT * FROM deployments WHERE app_id = ? AND branch_id = ?`, [ticket.app_id, ticket.branch_id], (err, deployment) => {
                     if (err || !deployment || !deployment.version_url || deployment.version_url.trim() === '') {
@@ -435,12 +441,12 @@ app.put('/api/tickets/:id/status', authenticateApiKey, (req, res) => {
                                 if (err) {
                                     console.error('Error al actualizar versión automática al cerrar ticket:', err);
                                 } else {
-                                    console.log(`[Auto-Update] App ${ticket.app_id} en provincia ${ticket.branch_id} actualizada a ${ticket.to_version} por cierre de ticket.`);
+                                    console.log(`[Auto-Update] App ${ticket.app_id} en entidad ${ticket.branch_id} actualizada a ${ticket.to_version} por cierre de ticket.`);
                                 }
                             }
                         );
                     } else {
-                        console.log(`[Auto-Update Omitido] La provincia ${ticket.branch_id} tiene configurada una URL de Auto-Sync propia para esta app.`);
+                        console.log(`[Auto-Update Omitido] La entidad ${ticket.branch_id} tiene configurada una URL de Auto-Sync propia para esta app.`);
                     }
                 });
             }
@@ -461,7 +467,7 @@ app.post('/api/tickets/:id/comments', authenticateApiKey, (req, res) => {
         });
 });
 
-// ================= ELIMINAR PROVINCIA POR API (Con cascada) =================
+// ================= ELIMINAR REGISTRO DE ENTIDAD POR API (Con cascada) =================
 app.delete('/api/branches/:id', authenticateApiKey, (req, res) => {
     const branchParam = req.params.id;
     db.serialize(() => {
@@ -471,9 +477,9 @@ app.delete('/api/branches/:id', authenticateApiKey, (req, res) => {
             db.run(`DELETE FROM branches WHERE id = ? OR LOWER(name) = LOWER(?)`, [branchParam, branchParam], function(err) {
                 if (err) return res.status(500).json({ error: err.message });
                 if (this.changes === 0) {
-                    return res.status(404).json({ error: 'Provincia no encontrada' });
+                    return res.status(404).json({ error: 'Registro no encontrado' });
                 }
-                res.json({ success: true, message: 'Provincia y sus despliegues asociados eliminados correctamente.' });
+                res.json({ success: true, message: 'Registro y sus despliegues asociados eliminados correctamente.' });
             });
         });
     });
@@ -498,13 +504,21 @@ app.delete('/api/apps/:id', authenticateApiKey, (req, res) => {
 });
 
 app.post('/api/settings', authenticateApiKey, (req, res) => {
-    const { admin_email } = req.body;
-    if (!admin_email) return res.status(400).json({ error: 'El email es obligatorio' });
+    const { admin_email, branch_label } = req.body;
+    
+    if (admin_email) {
+        db.run(`INSERT OR REPLACE INTO settings (key, value) VALUES ('admin_email', ?)`, [admin_email], function(err) {
+            if (err) return res.status(500).json({ error: err.message });
+        });
+    }
 
-    db.run(`INSERT OR REPLACE INTO settings (key, value) VALUES ('admin_email', ?)`, [admin_email], function(err) {
-        if (err) return res.status(500).json({ error: err.message });
-        res.json({ success: true, message: 'Configuración actualizada correctamente.' });
-    });
+    if (branch_label) {
+        db.run(`INSERT OR REPLACE INTO settings (key, value) VALUES ('branch_label', ?)`, [branch_label.trim()], function(err) {
+            if (err) return res.status(500).json({ error: err.message });
+        });
+    }
+
+    res.json({ success: true, message: 'Configuración actualizada correctamente.' });
 });
 
 app.post('/api/apps/check-updates', async (req, res) => {
@@ -574,7 +588,7 @@ app.post('/api/deployments/check-updates', authenticateApiKey, async (req, res) 
                 }
             } catch (e) {}
         }
-        res.json({ success: true, message: `Sincronización por provincia completada. ${updatedCount} actualizadas.` });
+        res.json({ success: true, message: `Sincronización completada. ${updatedCount} actualizadas.` });
     });
 });
 
@@ -589,7 +603,7 @@ app.post('/api/deployments', authenticateApiKey, (req, res) => {
         if (err || !appRow) return res.status(404).json({ error: 'Aplicación no encontrada' });
 
         db.get(`SELECT id FROM branches WHERE id = ? OR LOWER(name) = LOWER(?)`, [branchId, branchId], (err, branchRow) => {
-            if (err || !branchRow) return res.status(404).json({ error: 'Provincia no encontrada' });
+            if (err || !branchRow) return res.status(404).json({ error: 'Registro no encontrado' });
 
             db.run(`INSERT INTO deployments (app_id, branch_id, version, version_url) VALUES (?, ?, ?, ?)
                     ON CONFLICT(app_id, branch_id) DO UPDATE SET version = ?, version_url = ?`,
@@ -606,7 +620,7 @@ app.post('/api/deployments', authenticateApiKey, (req, res) => {
 app.post('/api/branches', async (req, res) => {
     const { name, contactEmail } = req.body;
     if (!name || !name.trim()) {
-        return res.status(400).json({ success: false, error: 'El nombre de la provincia es obligatorio.' });
+        return res.status(400).json({ success: false, error: 'El nombre es obligatorio.' });
     }
 
     const trimmedName = name.trim();
@@ -616,7 +630,7 @@ app.post('/api/branches', async (req, res) => {
             return res.status(500).json({ success: false, error: err.message });
         }
         if (row) {
-            return res.status(400).json({ success: false, error: 'Ya existe una provincia registrada con ese nombre.' });
+            return res.status(400).json({ success: false, error: 'Ya existe un registro con ese nombre.' });
         }
 
         const id = trimmedName.toLowerCase().replace(/[^a-z0-9]/g, '-');
@@ -624,7 +638,7 @@ app.post('/api/branches', async (req, res) => {
             if (err) {
                 return res.status(500).json({ success: false, error: err.message });
             }
-            res.json({ success: true, message: 'Provincia creada correctamente.' });
+            res.json({ success: true, message: 'Creado correctamente.' });
         });
     });
 });
