@@ -429,3 +429,5 @@ npm test
 ## Licencia
 
 Este proyecto no define una licencia específica en el repositorio. Revisá la política del equipo o del cliente antes de reutilizarlo en producción.
+
+.
